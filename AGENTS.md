@@ -1,4 +1,8 @@
-# 项目上下文
+# Helen服装批发管理系统 - 项目上下文
+
+## 项目概述
+
+面向广州服装批发商 Helen 的业务管理系统前端，用于管理非洲B端客户的服装批发业务。系统语言为简体中文，金额单位为人民币¥，库存单位为件。当前为纯前端+模拟数据阶段，不接真实后端。
 
 ### 版本技术栈
 
@@ -13,20 +17,34 @@
 ```
 ├── public/                 # 静态资源
 ├── scripts/                # 构建与启动脚本
-│   ├── build.sh            # 构建脚本
-│   ├── dev.sh              # 开发环境启动脚本
-│   ├── prepare.sh          # 预处理脚本
-│   └── start.sh            # 生产环境启动脚本
 ├── src/
 │   ├── app/                # 页面路由与布局
-│   ├── components/ui/      # Shadcn UI 组件库
+│   │   ├── (dashboard)/    # 业务页面（侧边栏布局）
+│   │   │   ├── page.tsx              # 首页仪表盘
+│   │   │   ├── customers/            # 客户管理（列表+详情）
+│   │   │   ├── orders/               # 销售订单（列表+新建+Receipt）
+│   │   │   ├── inventory/            # 库存管理
+│   │   │   ├── shipping/             # 发货管理
+│   │   │   ├── payments/             # 收款管理
+│   │   │   ├── products/             # 商品管理（列表+详情）
+│   │   │   ├── factories/            # 工厂管理（列表+详情）
+│   │   │   ├── finance/              # 财务报表
+│   │   │   ├── receivables/          # 客户应收汇总
+│   │   │   ├── new-arrival/          # 上新通知
+│   │   │   ├── data-import/          # 数据导入
+│   │   │   └── settings/             # 系统设置
+│   │   └── layout.tsx                # 根布局
+│   ├── components/
+│   │   ├── layout/                   # 布局组件（sidebar, header）
+│   │   └── ui/                       # shadcn/ui 组件库
 │   ├── hooks/              # 自定义 Hooks
-│   ├── lib/                # 工具库
+│   ├── lib/
+│   │   ├── mock-data.ts    # 模拟数据（客户、订单、商品等20+类型）
 │   │   └── utils.ts        # 通用工具函数 (cn)
 │   └── server.ts           # 自定义服务端入口
-├── next.config.ts          # Next.js 配置
-├── package.json            # 项目依赖管理
-└── tsconfig.json           # TypeScript 配置
+├── next.config.ts
+├── package.json
+└── tsconfig.json
 ```
 
 - 项目文件（如 app 目录、pages 目录、components 等）默认初始化到 `src/` 目录下。
