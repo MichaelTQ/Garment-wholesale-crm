@@ -12,7 +12,6 @@ import React, {
   type ReactNode,
 } from 'react';
 import {
-  customerLedgers as initialCustomerLedgers,
   customers as initialCustomers,
   factories as initialFactories,
   factoryPayments as initialFactoryPayments,
@@ -24,6 +23,7 @@ import {
   products as initialProducts,
   shipments as initialShipments,
   warehouses as initialWarehouses,
+  customerLedgers as initialCustomerLedgers,
 } from '@/lib/mock-data';
 import type { Product } from '@/lib/mock-data';
 import {
@@ -164,6 +164,48 @@ function normalizeStoredState(value: unknown): BusinessState | null {
   });
 }
 
+/** 从 Supabase 加载全量业务数据 */
+async function loadFromSupabase(): Promise<BusinessState | null> {
+  try {
+    const res = await fetch('/api/db/load', { method: 'POST' });
+    if (!res.ok) {
+      console.warn('从数据库加载失败，HTTP', res.status);
+      return null;
+    }
+    const json = await res.json();
+    if (!json.ok || !json.data) {
+      console.warn('从数据库加载失败:', json.error);
+      return null;
+    }
+    // Normalize the data from DB
+    const normalized = normalizeStoredState(json.data);
+    if (!normalized) {
+      console.warn('数据库数据格式不兼容');
+      return null;
+    }
+    return normalized;
+  } catch (err) {
+    console.warn('从数据库加载异常:', err);
+    return null;
+  }
+}
+
+/** 全量同步到 Supabase（防抖后调用） */
+async function syncToSupabase(state: BusinessState): Promise<void> {
+  try {
+    const res = await fetch('/api/db/sync', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ state }),
+    });
+    if (!res.ok) {
+      console.warn('同步到数据库失败，HTTP', res.status);
+    }
+  } catch (err) {
+    console.warn('同步到数据库异常:', err);
+  }
+}
+
 interface BusinessContextValue extends BusinessState {
   hydrated: boolean;
   productionInbound: (command: ProductionInboundCommand) => BusinessOperationResult;
@@ -190,6 +232,7 @@ export function BusinessProvider({ children }: { children: ReactNode }) {
   const [state, dispatch] = useReducer(businessReducer, undefined, createInitialState);
   const [hydrated, setHydrated] = useState(false);
   const stateRef = useRef(state);
+  const syncTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const replaceState = useCallback((nextState: BusinessState) => {
     const derived = deriveBusinessState(nextState);
@@ -197,24 +240,69 @@ export function BusinessProvider({ children }: { children: ReactNode }) {
     dispatch({ type: 'REPLACE_STATE', state: derived });
   }, []);
 
-  useEffect(() => {
+  // 防抖同步到 Supabase + localStorage
+  const scheduleSync = useCallback((s: BusinessState) => {
+    // localStorage 即时写入（快速恢复）
     try {
-      const raw = window.localStorage.getItem(BUSINESS_STORAGE_KEY);
-      if (raw) {
-        const normalized = normalizeStoredState(JSON.parse(raw) as unknown);
-        if (normalized) replaceState(normalized);
-      }
+      window.localStorage.setItem(BUSINESS_STORAGE_KEY, JSON.stringify(s));
     } catch {
-      window.localStorage.removeItem(BUSINESS_STORAGE_KEY);
-    } finally {
+      // ignore
+    }
+    // Supabase 防抖写入（1秒）
+    if (syncTimerRef.current) clearTimeout(syncTimerRef.current);
+    syncTimerRef.current = setTimeout(() => {
+      syncToSupabase(s);
+    }, 1000);
+  }, []);
+
+  // 初始化：优先从 Supabase 加载，回退到 localStorage
+  useEffect(() => {
+    let cancelled = false;
+
+    async function hydrate() {
+      // 1. 先尝试 localStorage（快速显示）
+      let localState: BusinessState | null = null;
+      try {
+        const raw = window.localStorage.getItem(BUSINESS_STORAGE_KEY);
+        if (raw) {
+          localState = normalizeStoredState(JSON.parse(raw) as unknown);
+        }
+      } catch {
+        window.localStorage.removeItem(BUSINESS_STORAGE_KEY);
+      }
+
+      if (localState) {
+        replaceState(localState);
+        setHydrated(true);
+      }
+
+      // 2. 再从 Supabase 加载（权威数据源）
+      const dbState = await loadFromSupabase();
+      if (cancelled) return;
+
+      if (dbState) {
+        replaceState(dbState);
+        // 同步更新 localStorage
+        try {
+          window.localStorage.setItem(BUSINESS_STORAGE_KEY, JSON.stringify(dbState));
+        } catch {
+          // ignore
+        }
+      }
+
       setHydrated(true);
     }
+
+    hydrate();
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [replaceState]);
 
+  // 状态变更时同步
   useEffect(() => {
     if (!hydrated) return;
-    window.localStorage.setItem(BUSINESS_STORAGE_KEY, JSON.stringify(state));
-  }, [hydrated, state]);
+    scheduleSync(state);
+  }, [hydrated, state, scheduleSync]);
 
   const runTransaction = useCallback(
     (

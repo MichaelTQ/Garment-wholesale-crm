@@ -21,7 +21,7 @@ export interface Customer {
   avgOrderAmount: number;
   purchaseFrequency: string;
   notes: string;
-  createdAt: string;
+  createdAt?: string;
 }
 
 export interface Product {
@@ -65,7 +65,7 @@ export interface ProductionBatch {
   id: string;
   batchNo: string;
   factoryId: string;
-  factoryName: string;
+  factoryName?: string;
   productId: string;
   styleNo: string;
   productName: string;
@@ -76,7 +76,7 @@ export interface ProductionBatch {
   totalCost: number;
   inboundWarehouseId: string;
   warehouseId: string;
-  warehouseName: string;
+  warehouseName?: string;
   inboundDate: string;
   startDate?: string;
   notes?: string;
@@ -121,8 +121,8 @@ export interface Order {
   presaveDeduction: number;
   finalReceivable: number;
   notes: string;
-  createdAt: string;
-  updatedAt: string;
+  createdAt?: string;
+  updatedAt?: string;
 }
 
 export interface Shipment {
@@ -157,7 +157,7 @@ export interface Payment {
   notes: string;
   allocatedAmount: number;
   depositAmount: number;
-  createdAt: string;
+  createdAt?: string;
 }
 
 export interface FactoryPayment {
