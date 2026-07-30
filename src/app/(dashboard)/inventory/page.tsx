@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -10,18 +10,21 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { inventoryRecords, inventoryFlows, warehouses, products, formatCurrency, getStatusColor } from '@/lib/mock-data';
-import { toast } from 'sonner';
-
-const totalActual = inventoryRecords.reduce((s, r) => s + r.actualStock, 0);
-const totalReserved = inventoryRecords.reduce((s, r) => s + r.reservedStock, 0);
-const totalSellable = inventoryRecords.reduce((s, r) => s + r.sellableStock, 0);
-const lowStockCount = inventoryRecords.filter(r => r.status === '低库存' || r.status === '缺货').length;
+import { warehouses, products, formatCurrency, getStatusColor } from '@/lib/mock-data';
+import { useBusinessState } from '@/lib/state/provider';
+import { InboundDialog } from '@/components/inbound/inbound-dialog';
 
 export default function InventoryPage() {
+  const { inventoryRecords, inventoryFlows } = useBusinessState();
   const [activeTab, setActiveTab] = useState('summary');
   const [showTransferDialog, setShowTransferDialog] = useState(false);
   const [warehouseFilter, setWarehouseFilter] = useState('全部');
+  const [showInboundDialog, setShowInboundDialog] = useState(false);
+
+  const totalActual = useMemo(() => inventoryRecords.reduce((s, r) => s + r.actualStock, 0), [inventoryRecords]);
+  const totalReserved = useMemo(() => inventoryRecords.reduce((s, r) => s + r.reservedStock, 0), [inventoryRecords]);
+  const totalSellable = useMemo(() => inventoryRecords.reduce((s, r) => s + r.sellableStock, 0), [inventoryRecords]);
+  const lowStockCount = useMemo(() => inventoryRecords.filter(r => r.status === '低库存' || r.status === '缺货').length, [inventoryRecords]);
 
   const summaryCards = [
     { label: '实际库存总量', value: `${totalActual.toLocaleString()}件` },
@@ -49,20 +52,30 @@ export default function InventoryPage() {
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between flex-wrap gap-2">
           <TabsList className="bg-white">
             <TabsTrigger value="summary">库存汇总</TabsTrigger>
             <TabsTrigger value="warehouse">仓库库存</TabsTrigger>
             <TabsTrigger value="flow">库存流水</TabsTrigger>
             <TabsTrigger value="transfer">仓库调拨</TabsTrigger>
           </TabsList>
-          <Select value={warehouseFilter} onValueChange={setWarehouseFilter}>
-            <SelectTrigger className="w-40 h-9"><SelectValue placeholder="按仓库筛选" /></SelectTrigger>
-            <SelectContent>
-              <SelectItem value="全部">全部仓库</SelectItem>
-              {warehouses.map(w => <SelectItem key={w.id} value={w.id}>{w.name}</SelectItem>)}
-            </SelectContent>
-          </Select>
+          <div className="flex items-center gap-2">
+            <Select value={warehouseFilter} onValueChange={setWarehouseFilter}>
+              <SelectTrigger className="w-40 h-9"><SelectValue placeholder="按仓库筛选" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="全部">全部仓库</SelectItem>
+                {warehouses.map(w => <SelectItem key={w.id} value={w.id}>{w.name}</SelectItem>)}
+              </SelectContent>
+            </Select>
+            <Button
+              size="sm"
+              className="bg-[#1e3a5f] hover:bg-[#2d5a8e]"
+              onClick={() => setShowInboundDialog(true)}
+              aria-label="商品入库"
+            >
+              商品入库
+            </Button>
+          </div>
         </div>
 
         <TabsContent value="summary" className="mt-4">
@@ -144,6 +157,8 @@ export default function InventoryPage() {
                     <TableHead className="text-xs">日期</TableHead>
                     <TableHead className="text-xs">类型</TableHead>
                     <TableHead className="text-xs">商品</TableHead>
+                    <TableHead className="text-xs">颜色</TableHead>
+                    <TableHead className="text-xs">尺码</TableHead>
                     <TableHead className="text-xs">仓库</TableHead>
                     <TableHead className="text-xs text-right">变动数量</TableHead>
                     <TableHead className="text-xs text-right">变动前</TableHead>
@@ -160,6 +175,8 @@ export default function InventoryPage() {
                         <Badge variant="secondary" className="text-[10px] px-1.5 py-0">{f.type}</Badge>
                       </TableCell>
                       <TableCell className="text-xs">{f.product}</TableCell>
+                      <TableCell className="text-xs">{f.color || '-'}</TableCell>
+                      <TableCell className="text-xs">{f.size || '-'}</TableCell>
                       <TableCell className="text-xs">{f.warehouse}</TableCell>
                       <TableCell className={`text-xs text-right tabular-nums font-medium ${f.quantity > 0 ? 'text-green-600' : f.quantity < 0 ? 'text-red-600' : ''}`}>
                         {f.quantity > 0 ? '+' : ''}{f.quantity}
@@ -240,12 +257,18 @@ export default function InventoryPage() {
               </div>
               <DialogFooter>
                 <Button variant="outline" onClick={() => setShowTransferDialog(false)}>取消</Button>
-                <Button className="bg-[#1e3a5f] hover:bg-[#2d5a8e]" onClick={() => { setShowTransferDialog(false); toast.success('调拨单创建成功'); }}>确认调拨</Button>
+                <Button className="bg-[#1e3a5f] hover:bg-[#2d5a8e]" onClick={() => { setShowTransferDialog(false); }}>确认调拨</Button>
               </DialogFooter>
             </DialogContent>
           </Dialog>
         </TabsContent>
       </Tabs>
+
+      {/* 入库弹窗 */}
+      <InboundDialog
+        open={showInboundDialog}
+        onOpenChange={setShowInboundDialog}
+      />
     </div>
   );
 }

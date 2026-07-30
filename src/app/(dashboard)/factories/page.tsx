@@ -2,18 +2,28 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { factories, productionBatches, factoryPayments, formatCurrency, getStatusColor } from '@/lib/mock-data';
-import { toast } from 'sonner';
+import { factories, factoryPayments, formatCurrency, getStatusColor } from '@/lib/mock-data';
+import { useBusinessState } from '@/lib/state/provider';
+import { InboundDialog } from '@/components/inbound/inbound-dialog';
+import { canBatchInbound, getRemainingInboundQuantity } from '@/lib/services/inventory';
 
 export default function FactoriesPage() {
+  const { productionBatches } = useBusinessState();
   const [activeTab, setActiveTab] = useState('list');
+  const [showInboundDialog, setShowInboundDialog] = useState(false);
+  const [selectedBatchId, setSelectedBatchId] = useState<string>('');
 
   const totalUnpaid = factories.reduce((s, f) => s + f.unpaidAmount, 0);
+
+  const handleInboundClick = (batchId: string) => {
+    setSelectedBatchId(batchId);
+    setShowInboundDialog(true);
+  };
 
   return (
     <div className="space-y-4">
@@ -107,33 +117,54 @@ export default function FactoriesPage() {
                     <TableHead className="text-xs">商品</TableHead>
                     <TableHead className="text-xs">颜色</TableHead>
                     <TableHead className="text-xs">尺码</TableHead>
-                    <TableHead className="text-xs text-right">数量</TableHead>
+                    <TableHead className="text-xs text-right">生产数量</TableHead>
+                    <TableHead className="text-xs text-right">已入库</TableHead>
+                    <TableHead className="text-xs text-right">剩余</TableHead>
                     <TableHead className="text-xs text-right">单件成本</TableHead>
                     <TableHead className="text-xs text-right">总成本</TableHead>
                     <TableHead className="text-xs text-right">已付</TableHead>
                     <TableHead className="text-xs text-right">未付</TableHead>
                     <TableHead className="text-xs text-center">状态</TableHead>
+                    <TableHead className="text-xs text-center">操作</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {productionBatches.map(b => (
-                    <TableRow key={b.id}>
-                      <TableCell className="text-xs font-medium">{b.id.toUpperCase()}</TableCell>
-                      <TableCell className="text-xs">{b.factoryName}</TableCell>
-                      <TableCell className="text-xs">{b.styleNo}</TableCell>
-                      <TableCell className="text-xs">{b.productName}</TableCell>
-                      <TableCell className="text-xs">{b.color}</TableCell>
-                      <TableCell className="text-xs">{b.size}</TableCell>
-                      <TableCell className="text-xs text-right tabular-nums">{b.quantity}</TableCell>
-                      <TableCell className="text-xs text-right tabular-nums">{formatCurrency(b.unitCost)}</TableCell>
-                      <TableCell className="text-xs text-right tabular-nums">{formatCurrency(b.totalCost)}</TableCell>
-                      <TableCell className="text-xs text-right tabular-nums text-green-600">{formatCurrency(b.paidAmount)}</TableCell>
-                      <TableCell className="text-xs text-right tabular-nums text-red-600">{formatCurrency(b.unpaidAmount)}</TableCell>
-                      <TableCell className="text-center">
-                        <Badge variant="secondary" className={`text-[10px] px-1.5 py-0 ${getStatusColor(b.status)}`}>{b.status}</Badge>
-                      </TableCell>
-                    </TableRow>
-                  ))}
+                  {productionBatches.map(b => {
+                    const remaining = getRemainingInboundQuantity(b);
+                    return (
+                      <TableRow key={b.id}>
+                        <TableCell className="text-xs font-medium">{b.batchNo || b.id.toUpperCase()}</TableCell>
+                        <TableCell className="text-xs">{b.factoryName}</TableCell>
+                        <TableCell className="text-xs">{b.styleNo}</TableCell>
+                        <TableCell className="text-xs">{b.productName}</TableCell>
+                        <TableCell className="text-xs">{b.color}</TableCell>
+                        <TableCell className="text-xs">{b.size}</TableCell>
+                        <TableCell className="text-xs text-right tabular-nums">{b.quantity}</TableCell>
+                        <TableCell className="text-xs text-right tabular-nums">{b.inboundQuantity ?? 0}</TableCell>
+                        <TableCell className="text-xs text-right tabular-nums font-medium text-green-600">{remaining}</TableCell>
+                        <TableCell className="text-xs text-right tabular-nums">{formatCurrency(b.unitCost)}</TableCell>
+                        <TableCell className="text-xs text-right tabular-nums">{formatCurrency(b.totalCost)}</TableCell>
+                        <TableCell className="text-xs text-right tabular-nums text-green-600">{formatCurrency(b.paidAmount)}</TableCell>
+                        <TableCell className="text-xs text-right tabular-nums text-red-600">{formatCurrency(b.unpaidAmount)}</TableCell>
+                        <TableCell className="text-center">
+                          <Badge variant="secondary" className={`text-[10px] px-1.5 py-0 ${getStatusColor(b.status)}`}>{b.status}</Badge>
+                        </TableCell>
+                        <TableCell className="text-center">
+                          {canBatchInbound(b) && (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="h-7 text-xs"
+                              onClick={() => handleInboundClick(b.id)}
+                              aria-label={`登记入库 ${b.id.toUpperCase()}`}
+                            >
+                              登记入库
+                            </Button>
+                          )}
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
                 </TableBody>
               </Table>
             </CardContent>
@@ -173,6 +204,13 @@ export default function FactoriesPage() {
           </Card>
         </TabsContent>
       </Tabs>
+
+      {/* 入库弹窗 */}
+      <InboundDialog
+        open={showInboundDialog}
+        onOpenChange={setShowInboundDialog}
+        defaultBatchId={selectedBatchId}
+      />
     </div>
   );
 }

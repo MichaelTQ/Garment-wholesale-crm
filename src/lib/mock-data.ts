@@ -62,8 +62,10 @@ export interface Factory {
 
 export interface ProductionBatch {
   id: string;
+  batchNo: string;
   factoryId: string;
   factoryName: string;
+  productId: string;
   styleNo: string;
   productName: string;
   color: string;
@@ -71,12 +73,15 @@ export interface ProductionBatch {
   quantity: number;
   unitCost: number;
   totalCost: number;
+  inboundWarehouseId: string;
   warehouseId: string;
   warehouseName: string;
   inboundDate: string;
+  /** 累计已入库数量 */
+  inboundQuantity: number;
   paidAmount: number;
   unpaidAmount: number;
-  status: '待生产' | '生产中' | '待入库' | '已入库' | '已结清';
+  status: '待生产' | '生产中' | '待入库' | '部分入库' | '已入库' | '已结清' | '已取消';
 }
 
 export interface OrderItem {
@@ -177,6 +182,8 @@ export interface InventoryFlow {
   type: '生产入库' | '销售出库' | '仓库调拨' | '手工调整' | '库存预留' | '取消预留';
   product: string;
   styleNo: string;
+  color: string;
+  size: string;
   warehouse: string;
   quantity: number;
   beforeStock: number;
@@ -283,21 +290,21 @@ export const factories: Factory[] = [
 
 // ============ 生产批次 ============
 export const productionBatches: ProductionBatch[] = [
-  { id: 'pb001', factoryId: 'f001', factoryName: '广州新塘牛仔制衣厂', styleNo: 'HJ-001', productName: '经典直筒牛仔裤', color: '深蓝', size: 'M', quantity: 500, unitCost: 48, totalCost: 24000, warehouseId: 'wh1', warehouseName: '广州白云仓', inboundDate: '2025-01-20', paidAmount: 24000, unpaidAmount: 0, status: '已结清' },
-  { id: 'pb002', factoryId: 'f001', factoryName: '广州新塘牛仔制衣厂', styleNo: 'HJ-001', productName: '经典直筒牛仔裤', color: '深蓝', size: 'L', quantity: 500, unitCost: 48, totalCost: 24000, warehouseId: 'wh1', warehouseName: '广州白云仓', inboundDate: '2025-01-20', paidAmount: 12000, unpaidAmount: 12000, status: '已入库' },
-  { id: 'pb003', factoryId: 'f002', factoryName: '东莞大朗毛织厂', styleNo: 'HW-001', productName: '加绒连帽卫衣', color: '灰色', size: 'L', quantity: 300, unitCost: 58, totalCost: 17400, warehouseId: 'wh2', warehouseName: '广州番禺仓', inboundDate: '2025-03-05', paidAmount: 17400, unpaidAmount: 0, status: '已结清' },
-  { id: 'pb004', factoryId: 'f002', factoryName: '东莞大朗毛织厂', styleNo: 'HT-001', productName: '纯色圆领T恤', color: '白色', size: 'M', quantity: 800, unitCost: 18, totalCost: 14400, warehouseId: 'wh2', warehouseName: '广州番禺仓', inboundDate: '2025-01-12', paidAmount: 14400, unpaidAmount: 0, status: '已结清' },
-  { id: 'pb005', factoryId: 'f003', factoryName: '佛山盐步服装厂', styleNo: 'HL-001', productName: '碎花连衣裙', color: '蓝白碎花', size: 'M', quantity: 200, unitCost: 68, totalCost: 13600, warehouseId: 'wh1', warehouseName: '广州白云仓', inboundDate: '2025-04-25', paidAmount: 8000, unpaidAmount: 5600, status: '已入库' },
-  { id: 'pb006', factoryId: 'f004', factoryName: '中山沙溪外套厂', styleNo: 'HK-001', productName: '中长款风衣外套', color: '卡其', size: 'L', quantity: 150, unitCost: 105, totalCost: 15750, warehouseId: 'wh3', warehouseName: '东莞虎门仓', inboundDate: '2025-02-01', paidAmount: 15750, unpaidAmount: 0, status: '已结清' },
-  { id: 'pb007', factoryId: 'f004', factoryName: '中山沙溪外套厂', styleNo: 'HK-004', productName: '飞行员夹克', color: '军绿', size: 'L', quantity: 100, unitCost: 115, totalCost: 11500, warehouseId: 'wh3', warehouseName: '东莞虎门仓', inboundDate: '2025-07-12', paidAmount: 0, unpaidAmount: 11500, status: '已入库' },
-  { id: 'pb008', factoryId: 'f001', factoryName: '广州新塘牛仔制衣厂', styleNo: 'HJ-004', productName: '弹力小脚牛仔裤', color: '深蓝', size: 'M', quantity: 200, unitCost: 48, totalCost: 9600, warehouseId: 'wh1', warehouseName: '广州白云仓', inboundDate: '2025-06-25', paidAmount: 4800, unpaidAmount: 4800, status: '已入库' },
-  { id: 'pb009', factoryId: 'f005', factoryName: '汕头潮南针织厂', styleNo: 'HT-004', productName: '条纹长袖T恤', color: '蓝白条纹', size: 'L', quantity: 400, unitCost: 24, totalCost: 9600, warehouseId: 'wh2', warehouseName: '广州番禺仓', inboundDate: '2025-07-05', paidAmount: 9600, unpaidAmount: 0, status: '已结清' },
-  { id: 'pb010', factoryId: 'f003', factoryName: '佛山盐步服装厂', styleNo: 'HQ-001', productName: '高腰A字半裙', color: '黑色', size: 'M', quantity: 250, unitCost: 40, totalCost: 10000, warehouseId: 'wh1', warehouseName: '广州白云仓', inboundDate: '2025-04-01', paidAmount: 10000, unpaidAmount: 0, status: '已结清' },
-  { id: 'pb011', factoryId: 'f005', factoryName: '汕头潮南针织厂', styleNo: 'HT-006', productName: '字母印花T恤', color: '白色', size: 'L', quantity: 600, unitCost: 20, totalCost: 12000, warehouseId: 'wh2', warehouseName: '广州番禺仓', inboundDate: '2025-06-15', paidAmount: 6000, unpaidAmount: 6000, status: '已入库' },
-  { id: 'pb012', factoryId: 'f002', factoryName: '东莞大朗毛织厂', styleNo: 'HW-005', productName: '套头加绒卫衣', color: '粉色', size: 'M', quantity: 300, unitCost: 56, totalCost: 16800, warehouseId: 'wh2', warehouseName: '广州番禺仓', inboundDate: '', paidAmount: 0, unpaidAmount: 16800, status: '生产中' },
-  { id: 'pb013', factoryId: 'f004', factoryName: '中山沙溪外套厂', styleNo: 'HK-003', productName: '长款棉服外套', color: '黑色', size: 'L', quantity: 120, unitCost: 128, totalCost: 15360, warehouseId: 'wh3', warehouseName: '东莞虎门仓', inboundDate: '2025-05-10', paidAmount: 15360, unpaidAmount: 0, status: '已结清' },
-  { id: 'pb014', factoryId: 'f001', factoryName: '广州新塘牛仔制衣厂', styleNo: 'HJ-005', productName: '高腰喇叭牛仔裤', color: '深蓝', size: 'M', quantity: 150, unitCost: 55, totalCost: 8250, warehouseId: 'wh1', warehouseName: '广州白云仓', inboundDate: '2025-07-18', paidAmount: 0, unpaidAmount: 8250, status: '待入库' },
-  { id: 'pb015', factoryId: 'f003', factoryName: '佛山盐步服装厂', styleNo: 'HL-005', productName: '印花雪纺连衣裙', color: '绿白印花', size: 'M', quantity: 200, unitCost: 62, totalCost: 12400, warehouseId: 'wh1', warehouseName: '广州白云仓', inboundDate: '', paidAmount: 0, unpaidAmount: 12400, status: '待生产' },
+  { id: 'pb001', batchNo: 'PB-2025-001', factoryId: 'f001', productId: 'p001', factoryName: '广州新塘牛仔制衣厂', styleNo: 'HJ-001', productName: '经典直筒牛仔裤', color: '深蓝', size: 'M', quantity: 500, unitCost: 48, totalCost: 24000, inboundWarehouseId: 'wh1', warehouseId: 'wh1', warehouseName: '广州白云仓', inboundDate: '2025-01-20', inboundQuantity: 500, paidAmount: 24000, unpaidAmount: 0, status: '已结清' },
+  { id: 'pb002', batchNo: 'PB-2025-002', factoryId: 'f001', productId: 'p001', factoryName: '广州新塘牛仔制衣厂', styleNo: 'HJ-001', productName: '经典直筒牛仔裤', color: '深蓝', size: 'L', quantity: 500, unitCost: 48, totalCost: 24000, inboundWarehouseId: 'wh1', warehouseId: 'wh1', warehouseName: '广州白云仓', inboundDate: '2025-01-20', inboundQuantity: 500, paidAmount: 12000, unpaidAmount: 12000, status: '已入库' },
+  { id: 'pb003', batchNo: 'PB-2025-003', factoryId: 'f002', productId: 'p006', factoryName: '东莞大朗毛织厂', styleNo: 'HW-001', productName: '加绒连帽卫衣', color: '灰色', size: 'L', quantity: 300, unitCost: 58, totalCost: 17400, inboundWarehouseId: 'wh2', warehouseId: 'wh2', warehouseName: '广州番禺仓', inboundDate: '2025-03-05', inboundQuantity: 300, paidAmount: 17400, unpaidAmount: 0, status: '已结清' },
+  { id: 'pb004', batchNo: 'PB-2025-004', factoryId: 'f002', productId: 'p011', factoryName: '东莞大朗毛织厂', styleNo: 'HT-001', productName: '纯色圆领T恤', color: '白色', size: 'M', quantity: 800, unitCost: 18, totalCost: 14400, inboundWarehouseId: 'wh2', warehouseId: 'wh2', warehouseName: '广州番禺仓', inboundDate: '2025-01-12', inboundQuantity: 800, paidAmount: 14400, unpaidAmount: 0, status: '已结清' },
+  { id: 'pb005', batchNo: 'PB-2025-005', factoryId: 'f003', productId: 'p017', factoryName: '佛山盐步服装厂', styleNo: 'HL-001', productName: '碎花连衣裙', color: '蓝白碎花', size: 'M', quantity: 200, unitCost: 68, totalCost: 13600, inboundWarehouseId: 'wh1', warehouseId: 'wh1', warehouseName: '广州白云仓', inboundDate: '2025-04-25', inboundQuantity: 200, paidAmount: 8000, unpaidAmount: 5600, status: '已入库' },
+  { id: 'pb006', batchNo: 'PB-2025-006', factoryId: 'f004', productId: 'p022', factoryName: '中山沙溪外套厂', styleNo: 'HK-001', productName: '中长款风衣外套', color: '卡其', size: 'L', quantity: 150, unitCost: 105, totalCost: 15750, inboundWarehouseId: 'wh3', warehouseId: 'wh3', warehouseName: '东莞虎门仓', inboundDate: '2025-02-01', inboundQuantity: 150, paidAmount: 15750, unpaidAmount: 0, status: '已结清' },
+  { id: 'pb007', batchNo: 'PB-2025-007', factoryId: 'f004', productId: 'p025', factoryName: '中山沙溪外套厂', styleNo: 'HK-004', productName: '飞行员夹克', color: '军绿', size: 'L', quantity: 100, unitCost: 115, totalCost: 11500, inboundWarehouseId: 'wh3', warehouseId: 'wh3', warehouseName: '东莞虎门仓', inboundDate: '2025-07-12', inboundQuantity: 100, paidAmount: 0, unpaidAmount: 11500, status: '已入库' },
+  { id: 'pb008', batchNo: 'PB-2025-008', factoryId: 'f001', productId: 'p004', factoryName: '广州新塘牛仔制衣厂', styleNo: 'HJ-004', productName: '弹力小脚牛仔裤', color: '深蓝', size: 'M', quantity: 200, unitCost: 48, totalCost: 9600, inboundWarehouseId: 'wh1', warehouseId: 'wh1', warehouseName: '广州白云仓', inboundDate: '2025-06-25', inboundQuantity: 200, paidAmount: 4800, unpaidAmount: 4800, status: '已入库' },
+  { id: 'pb009', batchNo: 'PB-2025-009', factoryId: 'f005', productId: 'p014', factoryName: '汕头潮南针织厂', styleNo: 'HT-004', productName: '条纹长袖T恤', color: '蓝白条纹', size: 'L', quantity: 400, unitCost: 24, totalCost: 9600, inboundWarehouseId: 'wh2', warehouseId: 'wh2', warehouseName: '广州番禺仓', inboundDate: '2025-07-05', inboundQuantity: 400, paidAmount: 9600, unpaidAmount: 0, status: '已结清' },
+  { id: 'pb010', batchNo: 'PB-2025-010', factoryId: 'f003', productId: 'p027', factoryName: '佛山盐步服装厂', styleNo: 'HQ-001', productName: '高腰A字半裙', color: '黑色', size: 'M', quantity: 250, unitCost: 40, totalCost: 10000, inboundWarehouseId: 'wh1', warehouseId: 'wh1', warehouseName: '广州白云仓', inboundDate: '2025-04-01', inboundQuantity: 250, paidAmount: 10000, unpaidAmount: 0, status: '已结清' },
+  { id: 'pb011', batchNo: 'PB-2025-011', factoryId: 'f005', productId: 'p016', factoryName: '汕头潮南针织厂', styleNo: 'HT-006', productName: '字母印花T恤', color: '白色', size: 'L', quantity: 600, unitCost: 20, totalCost: 12000, inboundWarehouseId: 'wh2', warehouseId: 'wh2', warehouseName: '广州番禺仓', inboundDate: '2025-06-15', inboundQuantity: 600, paidAmount: 6000, unpaidAmount: 6000, status: '已入库' },
+  { id: 'pb012', batchNo: 'PB-2025-012', factoryId: 'f002', productId: 'p010', factoryName: '东莞大朗毛织厂', styleNo: 'HW-005', productName: '套头加绒卫衣', color: '粉色', size: 'M', quantity: 300, unitCost: 56, totalCost: 16800, inboundWarehouseId: 'wh2', warehouseId: 'wh2', warehouseName: '广州番禺仓', inboundDate: '', inboundQuantity: 0, paidAmount: 0, unpaidAmount: 16800, status: '生产中' },
+  { id: 'pb013', batchNo: 'PB-2025-013', factoryId: 'f004', productId: 'p024', factoryName: '中山沙溪外套厂', styleNo: 'HK-003', productName: '长款棉服外套', color: '黑色', size: 'L', quantity: 120, unitCost: 128, totalCost: 15360, inboundWarehouseId: 'wh3', warehouseId: 'wh3', warehouseName: '东莞虎门仓', inboundDate: '2025-05-10', inboundQuantity: 120, paidAmount: 15360, unpaidAmount: 0, status: '已结清' },
+  { id: 'pb014', batchNo: 'PB-2025-014', factoryId: 'f001', productId: 'p005', factoryName: '广州新塘牛仔制衣厂', styleNo: 'HJ-005', productName: '高腰喇叭牛仔裤', color: '深蓝', size: 'M', quantity: 150, unitCost: 55, totalCost: 8250, inboundWarehouseId: 'wh1', warehouseId: 'wh1', warehouseName: '广州白云仓', inboundDate: '2025-07-18', inboundQuantity: 0, paidAmount: 0, unpaidAmount: 8250, status: '待入库' },
+  { id: 'pb015', batchNo: 'PB-2025-015', factoryId: 'f003', productId: 'p021', factoryName: '佛山盐步服装厂', styleNo: 'HL-005', productName: '印花雪纺连衣裙', color: '绿白印花', size: 'M', quantity: 200, unitCost: 62, totalCost: 12400, inboundWarehouseId: 'wh1', warehouseId: 'wh1', warehouseName: '广州白云仓', inboundDate: '', inboundQuantity: 0, paidAmount: 0, unpaidAmount: 12400, status: '待生产' },
 ];
 
 // ============ 订单 ============
@@ -407,16 +414,16 @@ export const inventoryRecords: InventoryRecord[] = [
 
 // ============ 库存流水 ============
 export const inventoryFlows: InventoryFlow[] = [
-  { id: 'if001', date: '2025-07-24', type: '库存预留', product: '飞行员夹克', styleNo: 'HK-004', warehouse: '东莞虎门仓', quantity: -50, beforeStock: 110, afterStock: 60, relatedDoc: 'ORD-2025-010', notes: '订单预留' },
-  { id: 'if002', date: '2025-07-23', type: '销售出库', product: '加绒连帽卫衣', styleNo: 'HW-001', warehouse: '广州番禺仓', quantity: -80, beforeStock: 280, afterStock: 200, relatedDoc: 'SHP-2025-003', notes: '空运发货' },
-  { id: 'if003', date: '2025-07-22', type: '生产入库', product: '飞行员夹克', styleNo: 'HK-004', warehouse: '东莞虎门仓', quantity: 100, beforeStock: 10, afterStock: 110, relatedDoc: 'PB-2025-007', notes: '工厂入库' },
-  { id: 'if004', date: '2025-07-21', type: '销售出库', product: '经典直筒牛仔裤', styleNo: 'HJ-001', warehouse: '广州白云仓', quantity: -50, beforeStock: 230, afterStock: 180, relatedDoc: 'SHP-2025-001', notes: '海运发货' },
-  { id: 'if005', date: '2025-07-20', type: '库存预留', product: '经典直筒牛仔裤', styleNo: 'HJ-001', warehouse: '广州白云仓', quantity: 0, beforeStock: 200, afterStock: 200, relatedDoc: 'ORD-2025-001', notes: '预留80件' },
-  { id: 'if006', date: '2025-07-18', type: '销售出库', product: '碎花连衣裙', styleNo: 'HL-001', warehouse: '广州白云仓', quantity: -40, beforeStock: 120, afterStock: 80, relatedDoc: 'SHP-2025-009', notes: '' },
-  { id: 'if007', date: '2025-07-15', type: '仓库调拨', product: '纯色圆领T恤', styleNo: 'HT-001', warehouse: '广州番禺仓', quantity: -50, beforeStock: 550, afterStock: 500, relatedDoc: 'TR-2025-001', notes: '调拨至白云仓' },
-  { id: 'if008', date: '2025-07-12', type: '手工调整', product: '加绒连帽卫衣', styleNo: 'HW-001', warehouse: '广州番禺仓', quantity: -5, beforeStock: 285, afterStock: 280, relatedDoc: '', notes: '盘点差异调整' },
-  { id: 'if009', date: '2025-07-10', type: '生产入库', product: '条纹长袖T恤', styleNo: 'HT-004', warehouse: '广州番禺仓', quantity: 400, beforeStock: 0, afterStock: 400, relatedDoc: 'PB-2025-009', notes: '' },
-  { id: 'if010', date: '2025-07-08', type: '取消预留', product: '纯色圆领T恤', styleNo: 'HT-001', warehouse: '广州番禺仓', quantity: 0, beforeStock: 550, afterStock: 550, relatedDoc: 'ORD-2025-C01', notes: '取消订单释放预留' },
+  { id: 'if001', date: '2025-07-24', type: '库存预留', product: '飞行员夹克', styleNo: 'HK-004', color: '军绿', size: 'L', warehouse: '东莞虎门仓', quantity: -50, beforeStock: 110, afterStock: 60, relatedDoc: 'ORD-2025-010', notes: '订单预留' },
+  { id: 'if002', date: '2025-07-23', type: '销售出库', product: '加绒连帽卫衣', styleNo: 'HW-001', color: '灰色', size: 'L', warehouse: '广州番禺仓', quantity: -80, beforeStock: 280, afterStock: 200, relatedDoc: 'SHP-2025-003', notes: '空运发货' },
+  { id: 'if003', date: '2025-07-22', type: '生产入库', product: '飞行员夹克', styleNo: 'HK-004', color: '军绿', size: 'L', warehouse: '东莞虎门仓', quantity: 100, beforeStock: 10, afterStock: 110, relatedDoc: 'PB-2025-007', notes: '工厂入库' },
+  { id: 'if004', date: '2025-07-21', type: '销售出库', product: '经典直筒牛仔裤', styleNo: 'HJ-001', color: '深蓝', size: 'L', warehouse: '广州白云仓', quantity: -50, beforeStock: 230, afterStock: 180, relatedDoc: 'SHP-2025-001', notes: '海运发货' },
+  { id: 'if005', date: '2025-07-20', type: '库存预留', product: '经典直筒牛仔裤', styleNo: 'HJ-001', color: '深蓝', size: 'L', warehouse: '广州白云仓', quantity: 0, beforeStock: 200, afterStock: 200, relatedDoc: 'ORD-2025-001', notes: '预留80件' },
+  { id: 'if006', date: '2025-07-18', type: '销售出库', product: '碎花连衣裙', styleNo: 'HL-001', color: '蓝白碎花', size: 'M', warehouse: '广州白云仓', quantity: -40, beforeStock: 120, afterStock: 80, relatedDoc: 'SHP-2025-009', notes: '' },
+  { id: 'if007', date: '2025-07-15', type: '仓库调拨', product: '纯色圆领T恤', styleNo: 'HT-001', color: '白色', size: 'M', warehouse: '广州番禺仓', quantity: -50, beforeStock: 550, afterStock: 500, relatedDoc: 'TR-2025-001', notes: '调拨至白云仓' },
+  { id: 'if008', date: '2025-07-12', type: '手工调整', product: '加绒连帽卫衣', styleNo: 'HW-001', color: '灰色', size: 'L', warehouse: '广州番禺仓', quantity: -5, beforeStock: 285, afterStock: 280, relatedDoc: '', notes: '盘点差异调整' },
+  { id: 'if009', date: '2025-07-10', type: '生产入库', product: '条纹长袖T恤', styleNo: 'HT-004', color: '蓝白条纹', size: 'L', warehouse: '广州番禺仓', quantity: 400, beforeStock: 0, afterStock: 400, relatedDoc: 'PB-2025-009', notes: '' },
+  { id: 'if010', date: '2025-07-08', type: '取消预留', product: '纯色圆领T恤', styleNo: 'HT-001', color: '白色', size: 'M', warehouse: '广州番禺仓', quantity: 0, beforeStock: 550, afterStock: 550, relatedDoc: 'ORD-2025-C01', notes: '取消订单释放预留' },
 ];
 
 // ============ 客户往来账 ============
@@ -477,6 +484,7 @@ export function getStatusColor(status: string): string {
     '待生产': 'bg-gray-100 text-gray-800',
     '待入库': 'bg-yellow-100 text-yellow-800',
     '已入库': 'bg-blue-100 text-blue-800',
+    '部分入库': 'bg-indigo-100 text-indigo-800',
     '已结清': 'bg-green-100 text-green-800',
   };
   return map[status] || 'bg-gray-100 text-gray-800';
