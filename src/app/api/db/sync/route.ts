@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getSupabaseClient } from '@/storage/database/supabase-client';
+import { getSupabaseClient, isSupabaseConfigured } from '@/storage/database/supabase-client';
 import type { BusinessState } from '@/lib/types/business';
 
 /**
@@ -22,21 +22,16 @@ function toSnakeCase(obj: any): Record<string, unknown> {
 }
 
 export async function syncFullState(state: BusinessState): Promise<SyncResult> {
+  if (!isSupabaseConfigured()) {
+    return { success: false, error: 'Supabase 未配置' };
+  }
   const client = getSupabaseClient();
   try {
 
-    // Helper: batch sync (delete all + insert)
+    // Helper: batch sync (upsert by primary key 'id')
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     async function syncTable(table: string, rows: any[]): Promise<void> {
       if (rows.length === 0) return;
-      // Delete all rows
-      const { error: delError } = await client
-        .from(table)
-        .delete()
-        .not('id', 'is', null);
-      if (delError) {
-        console.error(`清空 ${table} 失败:`, delError.message);
-      }
       // Convert to snake_case and handle JSON fields
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const processedRows = rows.map((row: any) => {
@@ -47,15 +42,23 @@ export async function syncFullState(state: BusinessState): Promise<SyncResult> {
             snakeRow[key] = JSON.stringify(val);
           }
         }
+        // Remove undefined/null fields to avoid overwriting DB defaults
+        for (const [key, val] of Object.entries(snakeRow)) {
+          if (val === undefined || val === null) {
+            delete snakeRow[key];
+          }
+        }
         return snakeRow;
       });
-      // Insert in batches of 100
+      // Upsert in batches of 100 (on conflict 'id', merge)
       for (let i = 0; i < processedRows.length; i += 100) {
         const batch = processedRows.slice(i, i + 100);
-        const { error: insError } = await client.from(table).insert(batch);
-        if (insError) {
-          console.error(`插入 ${table} 失败:`, insError.message, 'batch:', i);
-          throw new Error(`插入 ${table} 失败: ${insError.message}`);
+        const { error: upError } = await client
+          .from(table)
+          .upsert(batch, { onConflict: 'id' });
+        if (upError) {
+          console.error(`upsert ${table} 失败:`, upError.message, 'batch:', i);
+          throw new Error(`插入 ${table} 失败: ${upError.message}`);
         }
       }
     }

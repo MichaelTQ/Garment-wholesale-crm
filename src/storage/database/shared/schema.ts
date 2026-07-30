@@ -183,9 +183,9 @@ export const shipments = pgTable("shipments", {
 
 // ============ 发货单明细 ============
 export const shipment_items = pgTable("shipment_items", {
-  id: varchar("id", { length: 10 }).primaryKey(),
-  shipment_id: varchar("shipment_id", { length: 10 }).notNull().references(() => shipments.id),
-  order_item_id: varchar("order_item_id", { length: 10 }),
+  id: varchar("id", { length: 20 }).primaryKey(),
+  shipment_id: varchar("shipment_id", { length: 20 }).notNull().references(() => shipments.id),
+  order_item_id: varchar("order_item_id", { length: 20 }),
   style_no: varchar("style_no", { length: 20 }).notNull(),
   color: varchar("color", { length: 30 }).notNull(),
   size: varchar("size", { length: 20 }).notNull(),

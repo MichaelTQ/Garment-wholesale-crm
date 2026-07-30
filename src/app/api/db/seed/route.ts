@@ -1,11 +1,13 @@
 import { NextResponse } from 'next/server';
 import { generateFullBusinessState } from '@/lib/db/generate-mock-data';
 import { syncFullState } from '@/app/api/db/sync/route';
+import { isSupabaseConfigured, getSupabaseClient } from '@/storage/database/supabase-client';
 
 export async function POST() {
   try {
-    // Check if data already exists
-    const { getSupabaseClient } = await import('@/storage/database/supabase-client');
+    if (!isSupabaseConfigured()) {
+      return NextResponse.json({ ok: false, error: 'Supabase 未配置' }, { status: 500 });
+    }
     const client = getSupabaseClient();
     const { count } = await client
       .from('warehouses')

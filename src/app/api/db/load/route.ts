@@ -1,13 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getSupabaseClient } from '@/storage/database/supabase-client';
-
-const client = getSupabaseClient();
+import { getSupabaseClient, isSupabaseConfigured } from '@/storage/database/supabase-client';
 
 /**
  * POST /api/db/load
  * 从 Supabase 加载全量业务数据并返回 BusinessState JSON
  */
 export async function POST(request: NextRequest) {
+  if (!isSupabaseConfigured()) {
+    return NextResponse.json({ ok: false, error: 'Supabase 未配置' }, { status: 503 });
+  }
+  const client = getSupabaseClient();
   try {
     // Fetch all tables
     const [
