@@ -1,13 +1,13 @@
 'use client';
 
 import { useState } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { ArrowLeft } from 'lucide-react';
-import { factories, factoryPayments, formatCurrency, getStatusColor } from '@/lib/mock-data';
+import { formatCurrency, getStatusColor } from '@/lib/mock-data';
 import { useParams, useRouter } from 'next/navigation';
 import { useBusinessState } from '@/lib/state/provider';
 import { InboundDialog } from '@/components/inbound/inbound-dialog';
@@ -17,8 +17,8 @@ export default function FactoryDetailPage() {
   const params = useParams();
   const router = useRouter();
   const factoryId = params.id as string;
+  const { factories, factoryPayments, productionBatches } = useBusinessState();
   const factory = factories.find(f => f.id === factoryId);
-  const { productionBatches } = useBusinessState();
 
   const [showInboundDialog, setShowInboundDialog] = useState(false);
   const [selectedBatchId, setSelectedBatchId] = useState<string>('');

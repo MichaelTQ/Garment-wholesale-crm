@@ -1,120 +1,217 @@
 'use client';
 
-import { useState } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { useEffect, useMemo, useState } from 'react';
+import { useRouter } from 'next/navigation';
+import { ArrowLeft, Plus, Trash2 } from 'lucide-react';
+import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Separator } from '@/components/ui/separator';
-import { ArrowLeft, Plus, Trash2 } from 'lucide-react';
-import { customers, products, warehouses, formatCurrency } from '@/lib/mock-data';
-import { useRouter } from 'next/navigation';
-import { toast } from 'sonner';
+import { formatCurrency } from '@/lib/mock-data';
+import { useBusinessState } from '@/lib/state/provider';
+import type { OrderItemInput } from '@/lib/types/business';
+
+interface EditableOrderItem extends OrderItemInput {
+  rowId: string;
+}
+
+function createRowId(): string {
+  return typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
+    ? crypto.randomUUID()
+    : `row-${Date.now()}`;
+}
 
 export default function NewOrderPage() {
   const router = useRouter();
+  const { customers, products, warehouses, inventoryRecords, createOrder } = useBusinessState();
   const [selectedCustomerId, setSelectedCustomerId] = useState('');
-  const [orderItems, setOrderItems] = useState<Array<{
-    id: string; styleNo: string; productName: string; color: string; size: string;
-    warehouseId: string; warehouseName: string; availableStock: number;
-    quantity: number; unitPrice: number; subtotal: number;
-  }>>([]);
+  const [orderDate, setOrderDate] = useState('');
+  const [notes, setNotes] = useState('');
+  const [depositDeduction, setDepositDeduction] = useState(0);
+  const [orderItems, setOrderItems] = useState<EditableOrderItem[]>([]);
 
-  const selectedCustomer = customers.find(c => c.id === selectedCustomerId);
+  useEffect(() => {
+    setOrderDate(new Date().toISOString().slice(0, 10));
+  }, []);
+
+  const selectedCustomer = customers.find((customer) => customer.id === selectedCustomerId);
+  const selectableProducts = products.filter((product) => product.status !== '已停售');
 
   const addOrderItem = () => {
-    setOrderItems([...orderItems, {
-      id: `item-${Date.now()}`,
-      styleNo: '', productName: '', color: '', size: '',
-      warehouseId: '', warehouseName: '', availableStock: 0,
-      quantity: 0, unitPrice: 0, subtotal: 0,
-    }]);
+    setOrderItems((current) => [
+      ...current,
+      {
+        rowId: createRowId(),
+        productId: '',
+        styleNo: '',
+        productName: '',
+        color: '',
+        size: '',
+        warehouseId: '',
+        warehouseName: '',
+        quantity: 0,
+        unitPrice: 0,
+      },
+    ]);
   };
 
-  const removeOrderItem = (id: string) => {
-    setOrderItems(orderItems.filter(item => item.id !== id));
+  const removeOrderItem = (rowId: string) => {
+    setOrderItems((current) => current.filter((item) => item.rowId !== rowId));
   };
 
-  const updateOrderItem = (id: string, field: string, value: string | number) => {
-    setOrderItems(orderItems.map(item => {
-      if (item.id !== id) return item;
-      const updated = { ...item, [field]: value };
-      if (field === 'styleNo') {
-        const product = products.find(p => p.styleNo === value);
-        if (product) {
-          updated.productName = product.name;
-          updated.unitPrice = product.suggestedPrice;
-        }
-      }
-      if (field === 'quantity' || field === 'unitPrice') {
-        updated.subtotal = Number(updated.quantity) * Number(updated.unitPrice);
-      }
-      return updated;
+  const updateItem = (
+    rowId: string,
+    updater: (item: EditableOrderItem) => EditableOrderItem,
+  ) => {
+    setOrderItems((current) =>
+      current.map((item) => (item.rowId === rowId ? updater(item) : item)),
+    );
+  };
+
+  const chooseProduct = (rowId: string, productId: string) => {
+    const product = products.find((item) => item.id === productId);
+    if (!product) return;
+    updateItem(rowId, (item) => ({
+      ...item,
+      productId: product.id,
+      styleNo: product.styleNo,
+      productName: product.name,
+      color: product.colors[0]?.name ?? '',
+      size: product.sizes[0] ?? '',
+      warehouseId: '',
+      warehouseName: '',
+      quantity: 0,
+      unitPrice: product.suggestedPrice,
     }));
   };
 
-  const totalQuantity = orderItems.reduce((sum, item) => sum + Number(item.quantity), 0);
-  const totalAmount = orderItems.reduce((sum, item) => sum + item.subtotal, 0);
-  const presaveDeduction = 0;
-  const finalReceivable = totalAmount - presaveDeduction;
+  const getStock = (item: EditableOrderItem) =>
+    inventoryRecords.find(
+      (record) =>
+        record.styleNo === item.styleNo &&
+        record.color === item.color &&
+        record.size === item.size &&
+        record.warehouseId === item.warehouseId,
+    );
+
+  const getAvailableWarehouses = (item: EditableOrderItem) =>
+    warehouses.filter((warehouse) =>
+      inventoryRecords.some(
+        (record) =>
+          record.warehouseId === warehouse.id &&
+          record.styleNo === item.styleNo &&
+          record.color === item.color &&
+          record.size === item.size &&
+          record.sellableStock > 0,
+      ),
+    );
+
+  const totalQuantity = orderItems.reduce((sum, item) => sum + item.quantity, 0);
+  const totalAmount = orderItems.reduce(
+    (sum, item) => sum + item.quantity * item.unitPrice,
+    0,
+  );
+  const usableDeposit = Math.min(
+    Math.max(0, depositDeduction),
+    selectedCustomer?.presaveBalance ?? 0,
+    totalAmount,
+  );
+  const finalReceivable = Math.max(0, totalAmount - usableDeposit);
+
+  const submit = (confirm: boolean) => {
+    const result = createOrder({
+      customerId: selectedCustomerId,
+      orderDate,
+      items: orderItems.map((item) => ({
+        productId: item.productId,
+        styleNo: item.styleNo,
+        productName: item.productName,
+        color: item.color,
+        size: item.size,
+        warehouseId: item.warehouseId,
+        warehouseName: item.warehouseName,
+        quantity: item.quantity,
+        unitPrice: item.unitPrice,
+      })),
+      notes,
+      confirm,
+      depositDeduction: confirm ? usableDeposit : 0,
+    });
+    if (!result.ok) {
+      toast.error(result.error);
+      return;
+    }
+    toast.success(
+      confirm
+        ? '订单已确认，相关 SKU 库存已预留'
+        : '订单草稿已保存，尚未占用库存',
+    );
+    router.push('/orders');
+  };
+
+  const duplicateSkuRows = useMemo(() => {
+    const keys = orderItems.map(
+      (item) => `${item.styleNo}|${item.color}|${item.size}|${item.warehouseId}`,
+    );
+    return new Set(keys).size !== keys.length;
+  }, [orderItems]);
 
   return (
     <div className="space-y-4">
       <div className="flex items-center gap-3">
         <Button variant="ghost" size="sm" onClick={() => router.back()}>
-          <ArrowLeft className="h-4 w-4 mr-1" /> 返回
+          <ArrowLeft className="mr-1 h-4 w-4" /> 返回
         </Button>
         <h2 className="text-lg font-semibold">新建销售订单</h2>
       </div>
 
-      {/* Customer Info */}
       <Card className="shadow-sm">
         <CardHeader className="pb-2"><CardTitle className="text-base">客户信息</CardTitle></CardHeader>
         <CardContent className="space-y-4">
           <div className="grid gap-4 md:grid-cols-4">
             <div className="space-y-2">
               <Label>选择客户 *</Label>
-              <Select value={selectedCustomerId} onValueChange={setSelectedCustomerId}>
+              <Select value={selectedCustomerId} onValueChange={(value) => {
+                setSelectedCustomerId(value);
+                setDepositDeduction(0);
+              }}>
                 <SelectTrigger><SelectValue placeholder="请选择客户" /></SelectTrigger>
                 <SelectContent>
-                  {customers.map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
+                  {customers.map((customer) => (
+                    <SelectItem key={customer.id} value={customer.id}>{customer.name}</SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
+            </div>
+            <div className="space-y-2">
+              <Label>订单日期 *</Label>
+              <Input type="date" value={orderDate} onChange={(event) => setOrderDate(event.target.value)} />
             </div>
             {selectedCustomer && (
               <>
                 <div className="space-y-2">
-                  <Label>国家</Label>
-                  <Input value={selectedCustomer.country} readOnly className="bg-gray-50" />
+                  <Label>国家 / WhatsApp</Label>
+                  <Input value={`${selectedCustomer.country} / ${selectedCustomer.whatsapp}`} readOnly className="bg-gray-50" />
                 </div>
                 <div className="space-y-2">
-                  <Label>WhatsApp</Label>
-                  <Input value={selectedCustomer.whatsapp} readOnly className="bg-gray-50" />
-                </div>
-                <div className="space-y-2">
-                  <Label>当前欠款</Label>
-                  <Input value={formatCurrency(selectedCustomer.shippedDebt)} readOnly className="bg-gray-50 text-orange-600" />
+                  <Label>当前预存款</Label>
+                  <Input value={formatCurrency(selectedCustomer.presaveBalance)} readOnly className="bg-gray-50 text-blue-600" />
                 </div>
               </>
             )}
           </div>
-          {selectedCustomer && selectedCustomer.presaveBalance > 0 && (
-            <div className="text-sm text-blue-600 bg-blue-50 p-2 rounded">
-              客户预存余额：{formatCurrency(selectedCustomer.presaveBalance)}
-            </div>
-          )}
         </CardContent>
       </Card>
 
-      {/* Order Items */}
       <Card className="shadow-sm">
         <CardHeader className="pb-2">
           <div className="flex items-center justify-between">
             <CardTitle className="text-base">订单商品明细</CardTitle>
             <Button size="sm" variant="outline" onClick={addOrderItem}>
-              <Plus className="h-4 w-4 mr-1" /> 添加商品
+              <Plus className="mr-1 h-4 w-4" /> 添加商品
             </Button>
           </div>
         </CardHeader>
@@ -123,97 +220,183 @@ export default function NewOrderPage() {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead className="text-xs">款号</TableHead>
-                  <TableHead className="text-xs">商品名称</TableHead>
+                  <TableHead className="text-xs">商品/款号</TableHead>
                   <TableHead className="text-xs">颜色</TableHead>
                   <TableHead className="text-xs">尺码</TableHead>
                   <TableHead className="text-xs">仓库</TableHead>
-                  <TableHead className="text-xs text-right">可销售库存</TableHead>
-                  <TableHead className="text-xs text-right">数量</TableHead>
-                  <TableHead className="text-xs text-right">销售单价</TableHead>
-                  <TableHead className="text-xs text-right">小计</TableHead>
-                  <TableHead className="text-xs"></TableHead>
+                  <TableHead className="text-right text-xs">可销售</TableHead>
+                  <TableHead className="text-right text-xs">数量</TableHead>
+                  <TableHead className="text-right text-xs">销售单价</TableHead>
+                  <TableHead className="text-right text-xs">小计</TableHead>
+                  <TableHead />
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {orderItems.map(item => (
-                  <TableRow key={item.id}>
-                    <TableCell>
-                      <Select value={item.styleNo} onValueChange={v => updateOrderItem(item.id, 'styleNo', v)}>
-                        <SelectTrigger className="h-8 text-xs w-28"><SelectValue placeholder="选择款号" /></SelectTrigger>
-                        <SelectContent>
-                          {products.filter(p => p.status === '正常销售' || p.status === '已上新').map(p => (
-                            <SelectItem key={p.styleNo} value={p.styleNo}>{p.styleNo}</SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </TableCell>
-                    <TableCell className="text-xs">{item.productName}</TableCell>
-                    <TableCell>
-                      <Input className="h-8 text-xs w-20" value={item.color} onChange={e => updateOrderItem(item.id, 'color', e.target.value)} />
-                    </TableCell>
-                    <TableCell>
-                      <Input className="h-8 text-xs w-16" value={item.size} onChange={e => updateOrderItem(item.id, 'size', e.target.value)} />
-                    </TableCell>
-                    <TableCell>
-                      <Select value={item.warehouseId} onValueChange={v => {
-                        const wh = warehouses.find(w => w.id === v);
-                        updateOrderItem(item.id, 'warehouseId', v);
-                        if (wh) updateOrderItem(item.id, 'warehouseName', wh.name);
-                      }}>
-                        <SelectTrigger className="h-8 text-xs w-28"><SelectValue placeholder="选择仓库" /></SelectTrigger>
-                        <SelectContent>
-                          {warehouses.map(w => <SelectItem key={w.id} value={w.id}>{w.name}</SelectItem>)}
-                        </SelectContent>
-                      </Select>
-                    </TableCell>
-                    <TableCell className="text-xs text-right tabular-nums">{item.availableStock || '-'}</TableCell>
-                    <TableCell>
-                      <Input type="number" className="h-8 text-xs w-16 text-right" value={item.quantity || ''} onChange={e => updateOrderItem(item.id, 'quantity', Number(e.target.value))} />
-                    </TableCell>
-                    <TableCell>
-                      <Input type="number" className="h-8 text-xs w-20 text-right" value={item.unitPrice || ''} onChange={e => updateOrderItem(item.id, 'unitPrice', Number(e.target.value))} />
-                    </TableCell>
-                    <TableCell className="text-xs text-right tabular-nums font-medium">{item.subtotal ? formatCurrency(item.subtotal) : '-'}</TableCell>
-                    <TableCell>
-                      <Button variant="ghost" size="icon" className="h-7 w-7 text-red-500" onClick={() => removeOrderItem(item.id)}>
-                        <Trash2 className="h-3.5 w-3.5" />
-                      </Button>
-                    </TableCell>
-                  </TableRow>
-                ))}
+                {orderItems.map((item) => {
+                  const product = products.find((entry) => entry.id === item.productId);
+                  const availableWarehouses = getAvailableWarehouses(item);
+                  const stock = getStock(item);
+                  return (
+                    <TableRow key={item.rowId}>
+                      <TableCell>
+                        <Select value={item.productId} onValueChange={(value) => chooseProduct(item.rowId, value)}>
+                          <SelectTrigger className="h-8 w-40 text-xs"><SelectValue placeholder="选择商品" /></SelectTrigger>
+                          <SelectContent>
+                            {selectableProducts.map((entry) => (
+                              <SelectItem key={entry.id} value={entry.id}>{entry.styleNo} - {entry.name}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </TableCell>
+                      <TableCell>
+                        <Select
+                          value={item.color}
+                          onValueChange={(value) => updateItem(item.rowId, (current) => ({
+                            ...current,
+                            color: value,
+                            warehouseId: '',
+                            warehouseName: '',
+                          }))}
+                        >
+                          <SelectTrigger className="h-8 w-24 text-xs"><SelectValue placeholder="颜色" /></SelectTrigger>
+                          <SelectContent>
+                            {product?.colors.map((color) => (
+                              <SelectItem key={color.name} value={color.name}>{color.name}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </TableCell>
+                      <TableCell>
+                        <Select
+                          value={item.size}
+                          onValueChange={(value) => updateItem(item.rowId, (current) => ({
+                            ...current,
+                            size: value,
+                            warehouseId: '',
+                            warehouseName: '',
+                          }))}
+                        >
+                          <SelectTrigger className="h-8 w-20 text-xs"><SelectValue placeholder="尺码" /></SelectTrigger>
+                          <SelectContent>
+                            {product?.sizes.map((size) => (
+                              <SelectItem key={size} value={size}>{size}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </TableCell>
+                      <TableCell>
+                        <Select
+                          value={item.warehouseId}
+                          onValueChange={(value) => {
+                            const warehouse = warehouses.find((entry) => entry.id === value);
+                            updateItem(item.rowId, (current) => ({
+                              ...current,
+                              warehouseId: value,
+                              warehouseName: warehouse?.name ?? '',
+                            }));
+                          }}
+                        >
+                          <SelectTrigger className="h-8 w-32 text-xs"><SelectValue placeholder="选择有货仓库" /></SelectTrigger>
+                          <SelectContent>
+                            {availableWarehouses.map((warehouse) => (
+                              <SelectItem key={warehouse.id} value={warehouse.id}>{warehouse.name}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </TableCell>
+                      <TableCell className="text-right text-xs tabular-nums">{stock?.sellableStock ?? '-'}</TableCell>
+                      <TableCell>
+                        <Input
+                          type="number"
+                          min={1}
+                          step={1}
+                          className="h-8 w-20 text-right text-xs"
+                          value={item.quantity || ''}
+                          onChange={(event) => updateItem(item.rowId, (current) => ({
+                            ...current,
+                            quantity: Number(event.target.value),
+                          }))}
+                        />
+                      </TableCell>
+                      <TableCell>
+                        <Input
+                          type="number"
+                          min={0}
+                          step="0.01"
+                          className="h-8 w-24 text-right text-xs"
+                          value={item.unitPrice || ''}
+                          onChange={(event) => updateItem(item.rowId, (current) => ({
+                            ...current,
+                            unitPrice: Number(event.target.value),
+                          }))}
+                        />
+                      </TableCell>
+                      <TableCell className="text-right text-xs font-medium tabular-nums">
+                        {formatCurrency(item.quantity * item.unitPrice)}
+                      </TableCell>
+                      <TableCell>
+                        <Button variant="ghost" size="icon" className="h-7 w-7 text-red-500" onClick={() => removeOrderItem(item.rowId)}>
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
                 {orderItems.length === 0 && (
                   <TableRow>
-                    <TableCell colSpan={10} className="text-center text-sm text-muted-foreground py-8">
-                      点击"添加商品"开始录入订单明细
+                    <TableCell colSpan={9} className="py-8 text-center text-sm text-muted-foreground">
+                      点击“添加商品”录入订单；只有已入库且有可销售库存的 SKU 才能选择仓库
                     </TableCell>
                   </TableRow>
                 )}
               </TableBody>
             </Table>
           </div>
+          {duplicateSkuRows && (
+            <p className="mt-2 text-xs text-orange-600">同一仓库的相同款号、颜色和尺码出现多行，建议合并数量。</p>
+          )}
+          <div className="mt-4 space-y-2">
+            <Label>订单备注</Label>
+            <textarea
+              className="w-full rounded-md border border-[#e5e7eb] px-3 py-2 text-sm"
+              rows={2}
+              value={notes}
+              onChange={(event) => setNotes(event.target.value)}
+              placeholder="订单内部备注..."
+            />
+          </div>
         </CardContent>
       </Card>
 
-      {/* Summary */}
       <Card className="shadow-sm">
-        <CardContent className="p-4">
+        <CardContent className="space-y-4 p-4">
+          {selectedCustomer && selectedCustomer.presaveBalance > 0 && (
+            <div className="flex max-w-md items-center gap-3">
+              <Label className="whitespace-nowrap">本单使用预存款</Label>
+              <Input
+                type="number"
+                min={0}
+                max={Math.min(selectedCustomer.presaveBalance, totalAmount)}
+                step="0.01"
+                value={depositDeduction || ''}
+                onChange={(event) => setDepositDeduction(Number(event.target.value))}
+              />
+              <span className="whitespace-nowrap text-xs text-muted-foreground">
+                最多 {formatCurrency(Math.min(selectedCustomer.presaveBalance, totalAmount))}
+              </span>
+            </div>
+          )}
           <div className="flex flex-wrap items-center justify-between gap-4">
-            <div className="flex gap-6 text-sm">
-              <span>商品总件数：<strong className="tabular-nums">{totalQuantity}</strong> 件</span>
-              <span>订单总金额：<strong className="tabular-nums">{formatCurrency(totalAmount)}</strong></span>
-              <span>客户预存款抵扣：<strong className="tabular-nums">{formatCurrency(presaveDeduction)}</strong></span>
-              <span>最终应收金额：<strong className="tabular-nums text-[#1e3a5f]">{formatCurrency(finalReceivable)}</strong></span>
+            <div className="flex flex-wrap gap-6 text-sm">
+              <span>商品总件数：<strong>{totalQuantity}</strong> 件</span>
+              <span>订单总金额：<strong>{formatCurrency(totalAmount)}</strong></span>
+              <span>预存款抵扣：<strong className="text-blue-600">{formatCurrency(usableDeposit)}</strong></span>
+              <span>最终应收：<strong className="text-[#1e3a5f]">{formatCurrency(finalReceivable)}</strong></span>
             </div>
             <div className="flex gap-2">
               <Button variant="outline" onClick={() => router.back()}>取消</Button>
-              <Button variant="outline" onClick={() => toast.success('草稿已保存')}>保存草稿</Button>
-              <Button className="bg-[#1e3a5f] hover:bg-[#2d5a8e]" onClick={() => {
-                if (!selectedCustomerId) { toast.error('请先选择客户'); return; }
-                if (orderItems.length === 0) { toast.error('请添加商品'); return; }
-                toast.success('订单确认成功，相关库存已被预留。');
-                router.push('/orders');
-              }}>确认订单</Button>
+              <Button variant="outline" onClick={() => submit(false)}>保存草稿</Button>
+              <Button className="bg-[#1e3a5f] hover:bg-[#2d5a8e]" onClick={() => submit(true)}>确认订单并预留库存</Button>
             </div>
           </div>
         </CardContent>

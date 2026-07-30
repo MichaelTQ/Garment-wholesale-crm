@@ -1,24 +1,31 @@
 'use client';
 
-import { useState } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { useEffect, useState } from 'react';
+import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Separator } from '@/components/ui/separator';
 import { ArrowLeft, MessageCircle, ShoppingCart, Wallet, Edit } from 'lucide-react';
-import { customers, orders, payments, shipments, customerLedgers, formatCurrency, getStatusColor } from '@/lib/mock-data';
+import { formatCurrency, getStatusColor } from '@/lib/mock-data';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { toast } from 'sonner';
+import { useBusinessState } from '@/lib/state/provider';
 
 export default function CustomerDetailPage() {
   const params = useParams();
   const router = useRouter();
+  const { customers, orders, payments, shipments, customerLedgers } = useBusinessState();
   const customerId = params.id as string;
   const customer = customers.find(c => c.id === customerId);
   const [activeTab, setActiveTab] = useState('overview');
+  const [today, setToday] = useState('');
+
+  useEffect(() => {
+    setToday(new Date().toISOString().slice(0, 10));
+  }, []);
 
   if (!customer) {
     return <div className="text-center py-12">客户不存在</div>;
@@ -28,6 +35,15 @@ export default function CustomerDetailPage() {
   const customerPayments = payments.filter(p => p.customerId === customerId);
   const customerShipments = shipments.filter(s => s.customerId === customerId);
   const ledger = customerLedgers[customerId] || [];
+  const todayTime = today ? new Date(today).getTime() : 0;
+  const recent90Cutoff = todayTime ? todayTime - 90 * 86400000 : 0;
+  const recent90OrderCount = recent90Cutoff
+    ? customerOrders.filter((order) => new Date(order.orderDate).getTime() >= recent90Cutoff).length
+    : 0;
+  const daysSincePurchase =
+    todayTime && customer.lastPurchaseDate
+      ? Math.max(0, Math.floor((todayTime - new Date(customer.lastPurchaseDate).getTime()) / 86400000))
+      : null;
 
   const summaryCards = [
     { label: '累计销售额', value: formatCurrency(customer.totalSales) },
@@ -68,12 +84,16 @@ export default function CustomerDetailPage() {
               <Button variant="outline" size="sm" onClick={() => toast.info('打开WhatsApp对话')}>
                 <MessageCircle className="h-4 w-4 mr-1" /> 联系WhatsApp
               </Button>
-              <Button variant="outline" size="sm">
-                <ShoppingCart className="h-4 w-4 mr-1" /> 新建订单
-              </Button>
-              <Button size="sm" className="bg-[#1e3a5f] hover:bg-[#2d5a8e]" onClick={() => toast.info('打开收款登记')}>
-                <Wallet className="h-4 w-4 mr-1" /> 登记收款
-              </Button>
+              <Link href="/orders/new">
+                <Button variant="outline" size="sm">
+                  <ShoppingCart className="h-4 w-4 mr-1" /> 新建订单
+                </Button>
+              </Link>
+              <Link href="/payments">
+                <Button size="sm" className="bg-[#1e3a5f] hover:bg-[#2d5a8e]">
+                  <Wallet className="h-4 w-4 mr-1" /> 登记收款
+                </Button>
+              </Link>
               <Button variant="outline" size="sm">
                 <Edit className="h-4 w-4 mr-1" /> 编辑
               </Button>
@@ -267,7 +287,9 @@ export default function CustomerDetailPage() {
                     <TableHead className="text-xs">业务说明</TableHead>
                     <TableHead className="text-xs text-right">增加应收</TableHead>
                     <TableHead className="text-xs text-right">收到款项</TableHead>
+                    <TableHead className="text-xs text-right">预存变动</TableHead>
                     <TableHead className="text-xs text-right">余额</TableHead>
+                    <TableHead className="text-xs text-right">预存余额</TableHead>
                     <TableHead className="text-xs">备注</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -282,13 +304,15 @@ export default function CustomerDetailPage() {
                       <TableCell className="text-xs">{l.description}</TableCell>
                       <TableCell className="text-xs text-right tabular-nums text-orange-600">{l.increaseReceivable ? formatCurrency(l.increaseReceivable) : ''}</TableCell>
                       <TableCell className="text-xs text-right tabular-nums text-green-600">{l.receivedAmount ? formatCurrency(l.receivedAmount) : ''}</TableCell>
+                      <TableCell className="text-xs text-right tabular-nums text-blue-600">{l.depositChange ? formatCurrency(l.depositChange) : ''}</TableCell>
                       <TableCell className="text-xs text-right tabular-nums font-medium">{formatCurrency(l.balance)}</TableCell>
+                      <TableCell className="text-xs text-right tabular-nums font-medium text-blue-600">{formatCurrency(l.depositBalance)}</TableCell>
                       <TableCell className="text-xs">{l.notes}</TableCell>
                     </TableRow>
                   ))}
                   {ledger.length === 0 && (
                     <TableRow>
-                      <TableCell colSpan={8} className="text-center text-sm text-muted-foreground py-8">
+                      <TableCell colSpan={10} className="text-center text-sm text-muted-foreground py-8">
                         暂无往来流水数据
                       </TableCell>
                     </TableRow>
@@ -334,13 +358,13 @@ export default function CustomerDetailPage() {
             <Card className="shadow-sm">
               <CardContent className="p-4">
                 <p className="text-xs text-muted-foreground">最近90天订单</p>
-                <p className="text-sm font-semibold tabular-nums mt-1">{customerOrders.filter(o => new Date(o.orderDate) > new Date('2025-04-25')).length}</p>
+                <p className="text-sm font-semibold tabular-nums mt-1">{recent90OrderCount}</p>
               </CardContent>
             </Card>
             <Card className="shadow-sm">
               <CardContent className="p-4">
                 <p className="text-xs text-muted-foreground">距离上次购买</p>
-                <p className="text-sm font-semibold tabular-nums mt-1">{Math.floor((new Date('2025-07-25').getTime() - new Date(customer.lastPurchaseDate).getTime()) / 86400000)}天</p>
+                <p className="text-sm font-semibold tabular-nums mt-1">{daysSincePurchase === null ? '-' : `${daysSincePurchase}天`}</p>
               </CardContent>
             </Card>
             <Card className="shadow-sm">

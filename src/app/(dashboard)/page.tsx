@@ -5,20 +5,20 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { TrendingUp, DollarSign, Package, AlertTriangle, ShoppingCart } from 'lucide-react';
-import { customers, orders, monthlySalesData, formatCurrency, getStatusColor } from '@/lib/mock-data';
+import { formatCurrency, getStatusColor } from '@/lib/mock-data';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
 import Link from 'next/link';
 import { useBusinessState } from '@/lib/state/provider';
-
-const topDebtCustomers = [...customers]
-  .sort((a, b) => b.shippedDebt - a.shippedDebt)
-  .slice(0, 5);
+import { selectMonthlySalesData, selectTopDebtCustomers } from '@/lib/selectors/business';
 
 export default function DashboardPage() {
-  const { inventoryRecords, productionBatches } = useBusinessState();
+  const business = useBusinessState();
+  const { inventoryRecords, productionBatches, customers, orders } = business;
+  const monthlySalesData = selectMonthlySalesData(business);
+  const topDebtCustomers = selectTopDebtCustomers(customers);
   const lowStockItems = inventoryRecords.filter(r => r.status === '低库存' || r.status === '缺货');
   const statsCards = [
-    { title: '本月销售额', value: formatCurrency(orders.reduce((sum, order) => sum + order.totalAmount, 0)), icon: DollarSign, color: 'text-[#1e3a5f]', bg: 'bg-[#e8eef6]' },
+    { title: '最近月已发货销售额', value: formatCurrency(monthlySalesData.at(-1)?.sales ?? 0), icon: DollarSign, color: 'text-[#1e3a5f]', bg: 'bg-[#e8eef6]' },
     { title: '本月销售利润', value: formatCurrency(monthlySalesData.at(-1)?.profit ?? 0), icon: TrendingUp, color: 'text-green-600', bg: 'bg-green-50' },
     { title: '客户应收总额', value: formatCurrency(customers.reduce((sum, customer) => sum + customer.orderReceivable, 0)), icon: DollarSign, color: 'text-orange-600', bg: 'bg-orange-50' },
     { title: '已发货实际欠款', value: formatCurrency(customers.reduce((sum, customer) => sum + customer.shippedDebt, 0)), icon: DollarSign, color: 'text-red-600', bg: 'bg-red-50' },

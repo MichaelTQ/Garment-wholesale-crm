@@ -5,18 +5,19 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Separator } from '@/components/ui/separator';
 import { Textarea } from '@/components/ui/textarea';
-import { MessageCircle, Filter, Send, Check, SkipForward, ExternalLink } from 'lucide-react';
-import { products, customers, getStatusColor } from '@/lib/mock-data';
+import { Filter, Check, SkipForward, ExternalLink } from 'lucide-react';
+import { getStatusColor } from '@/lib/mock-data';
 import { toast } from 'sonner';
+import { useBusinessState } from '@/lib/state/provider';
 
 type Step = 1 | 2 | 3 | 4;
 
 export default function NewArrivalPage() {
+  const { products, customers } = useBusinessState();
   const [step, setStep] = useState<Step>(1);
   const [selectedProducts, setSelectedProducts] = useState<string[]>([]);
   const [countryFilter, setCountryFilter] = useState('全部');

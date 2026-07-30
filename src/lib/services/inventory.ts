@@ -76,7 +76,9 @@ export function calcBatchStatusAfterInbound(
   totalInboundQuantity: number,
 ): ProductionBatch['status'] {
   if (totalInboundQuantity <= 0) return batch.status;
-  if (totalInboundQuantity >= batch.quantity) return '已入库';
+  if (totalInboundQuantity >= batch.quantity) {
+    return batch.unpaidAmount <= 0 ? '已结清' : '已入库';
+  }
   return '部分入库';
 }
 
