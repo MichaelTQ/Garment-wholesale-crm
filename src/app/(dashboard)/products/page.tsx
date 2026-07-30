@@ -21,6 +21,7 @@ import {
   splitFormList,
   type ProductFormValue,
 } from '@/lib/types/product';
+import { createBusinessId } from '@/lib/services/business';
 
 const statusOptions = ['全部', '设计中', '生产中', '已上新', '正常销售', '库存不足', '已停售'];
 
@@ -55,10 +56,14 @@ export default function ProductsPage() {
       return;
     }
 
-    addProduct(productFromFormValue(
+    const result = addProduct(productFromFormValue(
       productForm,
-      `p-${productForm.styleNo.trim().toLowerCase().replace(/[^a-z0-9]+/g, '-')}`,
+      createBusinessId('prd'),
     ));
+    if (!result.ok) {
+      setFormErrors([result.error ?? '商品创建失败']);
+      return;
+    }
     setShowAddDialog(false);
     setFormErrors([]);
     setProductForm(emptyProductFormValue);

@@ -4,49 +4,53 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { ArrowDownRight, DollarSign, TrendingUp, BarChart3 } from 'lucide-react';
-import { customers, orders, products, productionBatches, shipments, monthlySalesData, formatCurrency } from '@/lib/mock-data';
-
-// Calculate financial data
-const totalSales = orders.reduce((s, o) => s + o.totalAmount, 0);
-const totalReceivable = customers.reduce((s, c) => s + c.shippedDebt, 0);
-const totalOrderReceivable = customers.reduce((s, c) => s + c.orderReceivable, 0);
-const totalPreDeposit = customers.reduce((s, c) => s + c.preDeposit, 0);
-
-// Calculate cost of goods sold
-const shippedItems = shipments.flatMap(s => s.items);
-const totalCost = shippedItems.reduce((s, item) => {
-  const batch = productionBatches.find(b => b.styleNo === item.styleNo);
-  return s + (batch ? batch.unitCost * item.shippedQty : 0);
-}, 0);
-const totalProfit = totalSales - totalCost;
-const profitRate = totalSales > 0 ? ((totalProfit / totalSales) * 100).toFixed(1) : '0';
-
-// Factory payables
-const totalFactoryPayable = productionBatches.reduce((s, b) => s + b.unpaidAmount, 0);
-
-const monthlyData = monthlySalesData;
-
-// Customer profit ranking
-const customerProfitData = customers.map(c => {
-  const custOrders = orders.filter(o => o.customerId === c.id);
-  const sales = custOrders.reduce((s, o) => s + o.totalAmount, 0);
-  const cost = sales * 0.62; // Mock: 62% cost ratio
-  const profit = sales - cost;
-  return { ...c, sales, cost, profit, rate: sales > 0 ? ((profit / sales) * 100).toFixed(1) : '0' };
-}).sort((a, b) => b.profit - a.profit);
-
-// Product profit ranking
-const productProfitData = products.slice(0, 15).map(p => {
-  const soldQty = Math.floor(p.currentStock * 0.7);
-  const sales = soldQty * p.suggestedPrice;
-  const cost = soldQty * p.lastCost;
-  const profit = sales - cost;
-  return { ...p, soldQty, sales, cost, profit, rate: sales > 0 ? ((profit / sales) * 100).toFixed(1) : '0' };
-}).sort((a, b) => b.profit - a.profit);
-
-const maxSales = Math.max(1, ...monthlyData.map(d => d.sales));
+import { formatCurrency } from '@/lib/mock-data';
+import { useBusinessState } from '@/lib/state/provider';
+import { selectMonthlySalesData } from '@/lib/selectors/business';
 
 export default function FinancePage() {
+  const business = useBusinessState();
+  const { customers, products, productionBatches, shipments } = business;
+  const shippedSales = shipments.reduce((sum, shipment) => sum + shipment.totalAmount, 0);
+  const totalSales = shippedSales;
+  const totalReceivable = customers.reduce((sum, customer) => sum + customer.shippedDebt, 0);
+  const totalOrderReceivable = customers.reduce((sum, customer) => sum + customer.orderReceivable, 0);
+  const totalPreDeposit = customers.reduce((sum, customer) => sum + customer.preDeposit, 0);
+  const shippedItems = shipments.flatMap((shipment) => shipment.items);
+  const totalCost = shippedItems.reduce((sum, item) => {
+    const batches = productionBatches
+      .filter((batch) => batch.styleNo === item.styleNo)
+      .sort((left, right) => right.inboundDate.localeCompare(left.inboundDate));
+    return sum + (batches[0]?.unitCost ?? 0) * item.thisShipQty;
+  }, 0);
+  const totalProfit = shippedSales - totalCost;
+  const profitRate = shippedSales > 0 ? ((totalProfit / shippedSales) * 100).toFixed(1) : '0';
+  const totalFactoryPayable = productionBatches.reduce((sum, batch) => sum + batch.unpaidAmount, 0);
+  const monthlyData = selectMonthlySalesData(business);
+  const maxSales = Math.max(1, ...monthlyData.map((item) => item.sales));
+  const customerProfitData = customers.map((customer) => {
+    const customerShipments = shipments.filter((shipment) => shipment.customerId === customer.id);
+    const sales = customerShipments.reduce((sum, shipment) => sum + shipment.totalAmount, 0);
+    const cost = customerShipments.flatMap((shipment) => shipment.items).reduce((sum, item) => {
+      const batch = productionBatches
+        .filter((entry) => entry.styleNo === item.styleNo)
+        .sort((left, right) => right.inboundDate.localeCompare(left.inboundDate))[0];
+      return sum + (batch?.unitCost ?? 0) * item.thisShipQty;
+    }, 0);
+    const profit = sales - cost;
+    return { ...customer, sales, cost, profit, rate: sales > 0 ? ((profit / sales) * 100).toFixed(1) : '0' };
+  }).sort((left, right) => right.profit - left.profit);
+  const productProfitData = products.map((product) => {
+    const items = shippedItems.filter((item) => item.styleNo === product.styleNo);
+    const soldQty = items.reduce((sum, item) => sum + item.thisShipQty, 0);
+    const sales = items.reduce((sum, item) => sum + item.thisShipAmount, 0);
+    const batch = productionBatches
+      .filter((entry) => entry.styleNo === product.styleNo)
+      .sort((left, right) => right.inboundDate.localeCompare(left.inboundDate))[0];
+    const cost = soldQty * (batch?.unitCost ?? 0);
+    const profit = sales - cost;
+    return { ...product, soldQty, sales, cost, profit, rate: sales > 0 ? ((profit / sales) * 100).toFixed(1) : '0' };
+  }).sort((left, right) => right.profit - left.profit);
   return (
     <div className="space-y-4">
       <Tabs defaultValue="overview">

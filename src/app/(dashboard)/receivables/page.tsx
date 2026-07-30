@@ -2,15 +2,17 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Search, Download, Eye } from 'lucide-react';
-import { customers, formatCurrency } from '@/lib/mock-data';
+import { formatCurrency } from '@/lib/mock-data';
+import { useBusinessState } from '@/lib/state/provider';
 
 export default function ReceivablesPage() {
+  const { customers } = useBusinessState();
   const [search, setSearch] = useState('');
 
   const totalOrderReceivable = customers.reduce((s, c) => s + c.orderReceivable, 0);

@@ -11,7 +11,7 @@ import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { ProductFormFields } from '@/components/products/product-form-fields';
 import { useBusinessState } from '@/lib/state/provider';
-import { warehouses, getStatusColor } from '@/lib/mock-data';
+import { getStatusColor } from '@/lib/mock-data';
 import {
   canBatchInbound,
   getRemainingInboundQuantity,
@@ -28,6 +28,7 @@ import {
 } from '@/lib/types/product';
 import type { InboundFormData, InboundType, ManualInboundCommand } from '@/lib/types/inventory';
 import { toast } from 'sonner';
+import { createBusinessId } from '@/lib/services/business';
 
 interface InboundDialogProps {
   open: boolean;
@@ -80,6 +81,7 @@ function createSkuRow(id = 'sku-1', styleNo = '', color = '', size = ''): SkuInb
 export function InboundDialog({ open, onOpenChange, defaultBatchId }: InboundDialogProps) {
   const {
     products,
+    warehouses,
     productionBatches,
     productionInbound,
     manualInbound,
@@ -173,7 +175,8 @@ export function InboundDialog({ open, onOpenChange, defaultBatchId }: InboundDia
     };
     const validation = validateProductionInbound(command, selectedBatch, warehouses);
     if (!validation.valid) return validation.errors;
-    productionInbound(command);
+    const result = productionInbound(command);
+    if (!result.ok) return [result.error ?? '生产入库失败'];
     toast.success(`生产入库成功，${command.quantity} 件已入库`);
     return [];
   };
@@ -194,7 +197,8 @@ export function InboundDialog({ open, onOpenChange, defaultBatchId }: InboundDia
     };
     const validation = validateManualInbound(command, warehouses);
     if (!validation.valid) return validation.errors;
-    manualInbound(command);
+    const result = manualInbound(command);
+    if (!result.ok) return [result.error ?? '商品入库失败'];
     toast.success(`商品入库成功，${command.quantity} 件已入库`);
     return [];
   };
@@ -240,7 +244,7 @@ export function InboundDialog({ open, onOpenChange, defaultBatchId }: InboundDia
 
     const product = productFromFormValue(
       newProduct,
-      `p-${styleNo.toLowerCase().replace(/[^a-z0-9]+/g, '-')}`,
+      createBusinessId('prd'),
     );
     const entries: ManualInboundCommand[] = skuRows.map((row) => ({
       type: '手工入库',
@@ -254,7 +258,8 @@ export function InboundDialog({ open, onOpenChange, defaultBatchId }: InboundDia
       reason: formData.reason,
       notes: `${row.sku}${formData.notes ? `；${formData.notes}` : ''}`,
     }));
-    newProductInbound({ product, entries });
+    const result = newProductInbound({ product, entries });
+    if (!result.ok) return [result.error ?? '新商品入库失败'];
     toast.success(`新商品创建成功，${entries.reduce((sum, entry) => sum + entry.quantity, 0)} 件已入库`);
     return [];
   };

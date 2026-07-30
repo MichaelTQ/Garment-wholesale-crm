@@ -1,17 +1,18 @@
 'use client';
 
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { ArrowLeft, Printer, Download, Share2 } from 'lucide-react';
 import { useParams, useRouter } from 'next/navigation';
-import { orders, customers, formatCurrency } from '@/lib/mock-data';
+import { formatCurrency } from '@/lib/mock-data';
 import { toast } from 'sonner';
+import { useBusinessState } from '@/lib/state/provider';
 
 export default function ReceiptPage() {
   const params = useParams();
   const router = useRouter();
+  const { orders, customers, payments } = useBusinessState();
   const orderId = params.id as string;
   const order = orders.find(o => o.id === orderId);
 
@@ -140,7 +141,7 @@ export default function ReceiptPage() {
               <Separator />
               <div className="flex justify-between text-sm">
                 <span className="text-muted-foreground">Payment Method</span>
-                <span>银行转账</span>
+                <span>{payments.find((payment) => payment.relatedOrderId === order.id)?.method ?? '-'}</span>
               </div>
             </div>
           </div>

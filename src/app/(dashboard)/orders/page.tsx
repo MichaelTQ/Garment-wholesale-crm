@@ -8,15 +8,15 @@ import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
-import { Label } from '@/components/ui/label';
 import { Search, Plus, Eye, Receipt } from 'lucide-react';
-import { orders, customers, formatCurrency, getStatusColor } from '@/lib/mock-data';
+import { formatCurrency, getStatusColor } from '@/lib/mock-data';
 import { toast } from 'sonner';
+import { useBusinessState } from '@/lib/state/provider';
 
 const orderStatuses = ['全部', '草稿', '待确认', '已确认', '部分发货', '已全部发货', '已完成', '已取消'];
 
 export default function OrdersPage() {
+  const { orders, customers, confirmOrder, cancelOrder } = useBusinessState();
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('全部');
   const [customerFilter, setCustomerFilter] = useState('全部');
@@ -109,13 +109,54 @@ export default function OrdersPage() {
                     <TableCell className="text-center">
                       <div className="flex items-center justify-center gap-1">
                         <Button variant="ghost" size="icon" className="h-7 w-7"><Eye className="h-3.5 w-3.5" /></Button>
-                        <Link href={`/receipts/${o.id}`}>
+                        <Link href={`/orders/${o.id}/receipt`}>
                           <Button variant="ghost" size="icon" className="h-7 w-7"><Receipt className="h-3.5 w-3.5" /></Button>
                         </Link>
+                        {o.status === '草稿' && (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="h-7 text-xs"
+                            onClick={() => {
+                              const result = confirmOrder(o.id);
+                              if (!result.ok) {
+                                toast.error(result.error);
+                                return;
+                              }
+                              toast.success('订单已确认，库存预留已生效');
+                            }}
+                          >
+                            确认
+                          </Button>
+                        )}
+                        {['草稿', '已确认'].includes(o.status) && o.shippedQuantity === 0 && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-7 text-xs text-red-600"
+                            onClick={() => {
+                              const result = cancelOrder(o.id);
+                              if (!result.ok) {
+                                toast.error(result.error);
+                                return;
+                              }
+                              toast.success('订单已取消，未发货预留库存已释放');
+                            }}
+                          >
+                            取消
+                          </Button>
+                        )}
                       </div>
                     </TableCell>
                   </TableRow>
                 ))}
+                {paginatedData.length === 0 && (
+                  <TableRow>
+                    <TableCell colSpan={12} className="h-24 text-center text-sm text-muted-foreground">
+                      暂无订单，请先完成客户和商品入库，再创建订单
+                    </TableCell>
+                  </TableRow>
+                )}
               </TableBody>
             </Table>
           </div>

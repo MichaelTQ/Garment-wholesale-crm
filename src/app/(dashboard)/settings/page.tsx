@@ -8,19 +8,40 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Separator } from '@/components/ui/separator';
 import { toast } from 'sonner';
+import { useBusinessState } from '@/lib/state/provider';
+import { BUSINESS_STORAGE_KEY } from '@/lib/types/business';
 
 export default function SettingsPage() {
+  const { resetBusinessData } = useBusinessState();
   const [businessName, setBusinessName] = useState('Helen服装批发');
   const [contactName, setContactName] = useState('Helen');
   const [phone, setPhone] = useState('+86 138 0013 8000');
   const [email, setEmail] = useState('helen@example.com');
   const [address, setAddress] = useState('广州市白云区服装城A区108号');
-  const [currency, setCurrency] = useState('CNY');
-  const [language, setLanguage] = useState('zh-CN');
+  const [currency] = useState('CNY');
+  const [language] = useState('zh-CN');
   const [whatsappDefault, setWhatsappDefault] = useState('+86 138 0013 8000');
 
   const handleSave = () => {
     toast.success('设置已保存');
+  };
+
+  const handleExport = () => {
+    const stored = window.localStorage.getItem(BUSINESS_STORAGE_KEY);
+    const blob = new Blob([stored ?? '{}'], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const anchor = document.createElement('a');
+    anchor.href = url;
+    anchor.download = `helen-crm-backup-${new Date().toISOString().slice(0, 10)}.json`;
+    anchor.click();
+    URL.revokeObjectURL(url);
+    toast.success('业务数据备份已导出');
+  };
+
+  const handleReset = () => {
+    if (!window.confirm('确认清空所有客户、商品、库存、订单、发货和收款数据吗？仓库配置会保留。此操作不可撤销。')) return;
+    resetBusinessData();
+    toast.success('全部业务数据已清空，仓库配置已保留');
   };
 
   return (
@@ -67,22 +88,19 @@ export default function SettingsPage() {
           <div className="grid gap-4 md:grid-cols-2">
             <div className="space-y-2">
               <Label>货币单位</Label>
-              <Select value={currency} onValueChange={setCurrency}>
+              <Select value={currency} disabled>
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="CNY">人民币 (¥)</SelectItem>
-                  <SelectItem value="USD">美元 ($)</SelectItem>
-                  <SelectItem value="EUR">欧元 (€)</SelectItem>
                 </SelectContent>
               </Select>
             </div>
             <div className="space-y-2">
               <Label>系统语言</Label>
-              <Select value={language} onValueChange={setLanguage}>
+              <Select value={language} disabled>
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="zh-CN">简体中文</SelectItem>
-                  <SelectItem value="en">English</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -140,15 +158,15 @@ export default function SettingsPage() {
               <p className="text-sm font-medium">数据备份</p>
               <p className="text-xs text-muted-foreground">导出系统所有数据为备份文件</p>
             </div>
-            <Button variant="outline" size="sm" onClick={() => toast.success('备份功能开发中')}>导出备份</Button>
+            <Button variant="outline" size="sm" onClick={handleExport}>导出备份</Button>
           </div>
           <Separator />
           <div className="flex items-center justify-between py-2">
             <div>
-              <p className="text-sm font-medium">清除缓存</p>
-              <p className="text-xs text-muted-foreground">清除浏览器缓存数据</p>
+              <p className="text-sm font-medium">清空全部业务数据</p>
+              <p className="text-xs text-muted-foreground">删除客户、商品、库存、订单、发货和收款，保留仓库配置</p>
             </div>
-            <Button variant="outline" size="sm" onClick={() => toast.success('缓存已清除')}>清除</Button>
+            <Button variant="outline" size="sm" className="text-red-600" onClick={handleReset}>清空数据</Button>
           </div>
         </CardContent>
       </Card>

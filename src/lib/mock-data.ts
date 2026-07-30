@@ -78,6 +78,8 @@ export interface ProductionBatch {
   warehouseId: string;
   warehouseName: string;
   inboundDate: string;
+  startDate?: string;
+  notes?: string;
   /** 累计已入库数量 */
   inboundQuantity: number;
   paidAmount: number;
@@ -86,6 +88,8 @@ export interface ProductionBatch {
 }
 
 export interface OrderItem {
+  id: string;
+  productId: string;
   styleNo: string;
   productName: string;
   color: string;
@@ -94,6 +98,7 @@ export interface OrderItem {
   warehouseName: string;
   availableStock: number;
   quantity: number;
+  shippedQuantity: number;
   unitPrice: number;
   subtotal: number;
 }
@@ -115,6 +120,9 @@ export interface Order {
   status: '草稿' | '待确认' | '已确认' | '部分发货' | '已全部发货' | '已完成' | '已取消';
   presaveDeduction: number;
   finalReceivable: number;
+  notes: string;
+  createdAt: string;
+  updatedAt: string;
 }
 
 export interface Shipment {
@@ -129,7 +137,7 @@ export interface Shipment {
   warehouseName: string;
   logisticsMethod: string;
   trackingNo: string;
-  items: { styleNo: string; color: string; size: string; orderQty: number; shippedQty: number; thisShipQty: number; unitPrice: number; thisShipAmount: number }[];
+  items: { orderItemId: string; styleNo: string; color: string; size: string; orderQty: number; shippedQty: number; thisShipQty: number; unitPrice: number; thisShipAmount: number }[];
   totalItems: number;
   totalAmount: number;
   notes: string;
@@ -147,6 +155,9 @@ export interface Payment {
   relatedOrderNo: string;
   voucher: string;
   notes: string;
+  allocatedAmount: number;
+  depositAmount: number;
+  createdAt: string;
 }
 
 export interface FactoryPayment {
@@ -202,6 +213,8 @@ export interface CustomerLedger {
   increaseReceivable: number;
   receivedAmount: number;
   balance: number;
+  depositChange: number;
+  depositBalance: number;
   notes: string;
 }
 

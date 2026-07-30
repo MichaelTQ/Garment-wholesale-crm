@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -10,16 +10,56 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { warehouses, products, getStatusColor } from '@/lib/mock-data';
+import { getStatusColor } from '@/lib/mock-data';
 import { useBusinessState } from '@/lib/state/provider';
 import { InboundDialog } from '@/components/inbound/inbound-dialog';
+import { toast } from 'sonner';
 
 export default function InventoryPage() {
-  const { inventoryRecords, inventoryFlows } = useBusinessState();
+  const { inventoryRecords, inventoryFlows, products, warehouses, transferStock } = useBusinessState();
   const [activeTab, setActiveTab] = useState('summary');
   const [showTransferDialog, setShowTransferDialog] = useState(false);
   const [warehouseFilter, setWarehouseFilter] = useState('全部');
   const [showInboundDialog, setShowInboundDialog] = useState(false);
+  const [fromWarehouseId, setFromWarehouseId] = useState('');
+  const [toWarehouseId, setToWarehouseId] = useState('');
+  const [transferStyleNo, setTransferStyleNo] = useState('');
+  const [transferColor, setTransferColor] = useState('');
+  const [transferSize, setTransferSize] = useState('');
+  const [transferQuantity, setTransferQuantity] = useState(0);
+  const [transferDate, setTransferDate] = useState('');
+  const [transferNotes, setTransferNotes] = useState('');
+
+  useEffect(() => {
+    setTransferDate(new Date().toISOString().slice(0, 10));
+  }, []);
+
+  const transferProduct = products.find((product) => product.styleNo === transferStyleNo);
+  const submitTransfer = () => {
+    const result = transferStock({
+      fromWarehouseId,
+      toWarehouseId,
+      styleNo: transferStyleNo,
+      color: transferColor,
+      size: transferSize,
+      quantity: transferQuantity,
+      date: transferDate,
+      notes: transferNotes,
+    });
+    if (!result.ok) {
+      toast.error(result.error);
+      return;
+    }
+    setShowTransferDialog(false);
+    setFromWarehouseId('');
+    setToWarehouseId('');
+    setTransferStyleNo('');
+    setTransferColor('');
+    setTransferSize('');
+    setTransferQuantity(0);
+    setTransferNotes('');
+    toast.success('调拨成功，两个仓库库存及流水已同步更新');
+  };
 
   const totalActual = useMemo(() => inventoryRecords.reduce((s, r) => s + r.actualStock, 0), [inventoryRecords]);
   const totalReserved = useMemo(() => inventoryRecords.reduce((s, r) => s + r.reservedStock, 0), [inventoryRecords]);
@@ -217,13 +257,13 @@ export default function InventoryPage() {
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label>调出仓库 *</Label>
-                    <Select><SelectTrigger><SelectValue placeholder="选择调出仓库" /></SelectTrigger>
+                    <Select value={fromWarehouseId} onValueChange={setFromWarehouseId}><SelectTrigger><SelectValue placeholder="选择调出仓库" /></SelectTrigger>
                       <SelectContent>{warehouses.map(w => <SelectItem key={w.id} value={w.id}>{w.name}</SelectItem>)}</SelectContent>
                     </Select>
                   </div>
                   <div className="space-y-2">
                     <Label>调入仓库 *</Label>
-                    <Select><SelectTrigger><SelectValue placeholder="选择调入仓库" /></SelectTrigger>
+                    <Select value={toWarehouseId} onValueChange={setToWarehouseId}><SelectTrigger><SelectValue placeholder="选择调入仓库" /></SelectTrigger>
                       <SelectContent>{warehouses.map(w => <SelectItem key={w.id} value={w.id}>{w.name}</SelectItem>)}</SelectContent>
                     </Select>
                   </div>
@@ -231,33 +271,51 @@ export default function InventoryPage() {
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label>商品款号 *</Label>
-                    <Select><SelectTrigger><SelectValue placeholder="选择商品" /></SelectTrigger>
+                    <Select value={transferStyleNo} onValueChange={(value) => {
+                      setTransferStyleNo(value);
+                      setTransferColor('');
+                      setTransferSize('');
+                    }}><SelectTrigger><SelectValue placeholder="选择商品" /></SelectTrigger>
                       <SelectContent>{products.map(p => <SelectItem key={p.id} value={p.styleNo}>{p.styleNo} - {p.name}</SelectItem>)}</SelectContent>
                     </Select>
                   </div>
                   <div className="space-y-2">
                     <Label>调拨数量 *</Label>
-                    <Input type="number" placeholder="0" />
+                    <Input type="number" min={1} step={1} value={transferQuantity || ''} onChange={(event) => setTransferQuantity(Number(event.target.value))} />
                   </div>
                 </div>
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label>颜色</Label>
-                    <Input placeholder="选择颜色" />
+                    <Select value={transferColor} onValueChange={setTransferColor}>
+                      <SelectTrigger><SelectValue placeholder="选择颜色" /></SelectTrigger>
+                      <SelectContent>
+                        {transferProduct?.colors.map((color) => <SelectItem key={color.name} value={color.name}>{color.name}</SelectItem>)}
+                      </SelectContent>
+                    </Select>
                   </div>
                   <div className="space-y-2">
                     <Label>尺码</Label>
-                    <Input placeholder="选择尺码" />
+                    <Select value={transferSize} onValueChange={setTransferSize}>
+                      <SelectTrigger><SelectValue placeholder="选择尺码" /></SelectTrigger>
+                      <SelectContent>
+                        {transferProduct?.sizes.map((size) => <SelectItem key={size} value={size}>{size}</SelectItem>)}
+                      </SelectContent>
+                    </Select>
                   </div>
                 </div>
                 <div className="space-y-2">
+                  <Label>调拨日期 *</Label>
+                  <Input type="date" value={transferDate} onChange={(event) => setTransferDate(event.target.value)} />
+                </div>
+                <div className="space-y-2">
                   <Label>备注</Label>
-                  <textarea className="w-full rounded-md border border-[#e5e7eb] px-3 py-2 text-sm" rows={2} placeholder="调拨原因..." />
+                  <textarea className="w-full rounded-md border border-[#e5e7eb] px-3 py-2 text-sm" rows={2} placeholder="调拨原因..." value={transferNotes} onChange={(event) => setTransferNotes(event.target.value)} />
                 </div>
               </div>
               <DialogFooter>
                 <Button variant="outline" onClick={() => setShowTransferDialog(false)}>取消</Button>
-                <Button className="bg-[#1e3a5f] hover:bg-[#2d5a8e]" onClick={() => { setShowTransferDialog(false); }}>确认调拨</Button>
+                <Button className="bg-[#1e3a5f] hover:bg-[#2d5a8e]" onClick={submitTransfer}>确认调拨</Button>
               </DialogFooter>
             </DialogContent>
           </Dialog>

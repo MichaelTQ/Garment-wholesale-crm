@@ -47,21 +47,6 @@ export interface InboundResult {
   updatedBatch?: ProductionBatch;
 }
 
-/** 业务状态（供 Context 使用） */
-export interface BusinessState {
-  products: Product[];
-  inventoryRecords: InventoryRecord[];
-  inventoryFlows: InventoryFlow[];
-  productionBatches: ProductionBatch[];
-}
-
-/** 业务 Action */
-export type BusinessAction =
-  | { type: 'PRODUCTION_INBOUND'; command: ProductionInboundCommand }
-  | { type: 'MANUAL_INBOUND'; command: ManualInboundCommand }
-  | { type: 'ADD_PRODUCT'; product: Product }
-  | { type: 'NEW_PRODUCT_INBOUND'; command: NewProductInboundCommand };
-
 /** SKU 匹配键 */
 export interface SkuKey {
   styleNo: string;
