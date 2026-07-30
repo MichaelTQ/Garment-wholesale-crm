@@ -10,7 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { warehouses, products, formatCurrency, getStatusColor } from '@/lib/mock-data';
+import { warehouses, products, getStatusColor } from '@/lib/mock-data';
 import { useBusinessState } from '@/lib/state/provider';
 import { InboundDialog } from '@/components/inbound/inbound-dialog';
 
@@ -204,7 +204,7 @@ export default function InventoryPage() {
               </div>
             </CardHeader>
             <CardContent>
-              <p className="text-sm text-muted-foreground py-8 text-center">暂无调拨记录，点击"新建调拨"创建</p>
+              <p className="text-sm text-muted-foreground py-8 text-center">暂无调拨记录，点击“新建调拨”创建</p>
             </CardContent>
           </Card>
 

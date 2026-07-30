@@ -1,6 +1,6 @@
 // 入库功能相关类型定义
 
-import type { InventoryRecord, InventoryFlow, ProductionBatch } from '@/lib/mock-data';
+import type { InventoryRecord, InventoryFlow, Product, ProductionBatch } from '@/lib/mock-data';
 
 /** 入库类型 */
 export type InboundType = '生产入库' | '手工入库';
@@ -29,6 +29,11 @@ export interface ManualInboundCommand {
   notes: string;
 }
 
+export interface NewProductInboundCommand {
+  product: Product;
+  entries: ManualInboundCommand[];
+}
+
 /** 入库命令联合类型 */
 export type InboundCommand = ProductionInboundCommand | ManualInboundCommand;
 
@@ -44,6 +49,7 @@ export interface InboundResult {
 
 /** 业务状态（供 Context 使用） */
 export interface BusinessState {
+  products: Product[];
   inventoryRecords: InventoryRecord[];
   inventoryFlows: InventoryFlow[];
   productionBatches: ProductionBatch[];
@@ -52,7 +58,9 @@ export interface BusinessState {
 /** 业务 Action */
 export type BusinessAction =
   | { type: 'PRODUCTION_INBOUND'; command: ProductionInboundCommand }
-  | { type: 'MANUAL_INBOUND'; command: ManualInboundCommand };
+  | { type: 'MANUAL_INBOUND'; command: ManualInboundCommand }
+  | { type: 'ADD_PRODUCT'; product: Product }
+  | { type: 'NEW_PRODUCT_INBOUND'; command: NewProductInboundCommand };
 
 /** SKU 匹配键 */
 export interface SkuKey {

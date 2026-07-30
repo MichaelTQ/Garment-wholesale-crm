@@ -5,14 +5,16 @@ import {
   inventoryRecords as initialInventoryRecords,
   inventoryFlows as initialInventoryFlows,
   productionBatches as initialProductionBatches,
+  products as initialProducts,
   warehouses,
 } from '@/lib/mock-data';
-import type { InventoryRecord, InventoryFlow, ProductionBatch } from '@/lib/mock-data';
+import type { InventoryFlow, Product } from '@/lib/mock-data';
 import type {
   BusinessState,
   BusinessAction,
   ProductionInboundCommand,
   ManualInboundCommand,
+  NewProductInboundCommand,
 } from '@/lib/types/inventory';
 import {
   registerProductionInbound,
@@ -24,6 +26,12 @@ import {
 // ============================================================
 
 const initialState: BusinessState = {
+  products: initialProducts.map((product) => ({
+    ...product,
+    colors: product.colors.map((color) => ({ ...color })),
+    sizes: [...product.sizes],
+    images: [...product.images],
+  })),
   inventoryRecords: initialInventoryRecords.map((r) => ({ ...r })),
   inventoryFlows: [...initialInventoryFlows],
   productionBatches: initialProductionBatches.map((b) => ({ ...b, inboundQuantity: b.inboundQuantity ?? (b.status === '已入库' || b.status === '已结清' ? b.quantity : 0) })),
@@ -38,6 +46,11 @@ function businessReducer(state: BusinessState, action: BusinessAction): Business
     case 'PRODUCTION_INBOUND': {
       const result = registerProductionInbound(state, action.command, warehouses);
       return {
+        products: state.products.map((product) =>
+          product.styleNo === result.updatedBatch?.styleNo
+            ? { ...product, currentStock: product.currentStock + action.command.quantity }
+            : product,
+        ),
         inventoryRecords: result.inventoryRecords,
         inventoryFlows: [result.newFlow, ...state.inventoryFlows],
         productionBatches: state.productionBatches.map((b) =>
@@ -48,9 +61,46 @@ function businessReducer(state: BusinessState, action: BusinessAction): Business
     case 'MANUAL_INBOUND': {
       const result = registerManualInbound(state, action.command, warehouses);
       return {
+        products: state.products.map((product) =>
+          product.styleNo === action.command.styleNo
+            ? { ...product, currentStock: product.currentStock + action.command.quantity }
+            : product,
+        ),
         inventoryRecords: result.inventoryRecords,
         inventoryFlows: [result.newFlow, ...state.inventoryFlows],
         productionBatches: state.productionBatches,
+      };
+    }
+    case 'ADD_PRODUCT':
+      return {
+        ...state,
+        products: [...state.products, action.product],
+      };
+    case 'NEW_PRODUCT_INBOUND': {
+      let workingState: BusinessState = {
+        ...state,
+        products: [...state.products, action.command.product],
+      };
+      const newFlows: InventoryFlow[] = [];
+
+      action.command.entries.forEach((entry, index) => {
+        const result = registerManualInbound(workingState, entry, warehouses);
+        newFlows.push({ ...result.newFlow, id: `${result.newFlow.id}-${index}` });
+        workingState = {
+          ...workingState,
+          inventoryRecords: result.inventoryRecords,
+        };
+      });
+
+      const inboundQuantity = action.command.entries.reduce((sum, entry) => sum + entry.quantity, 0);
+      return {
+        ...workingState,
+        products: workingState.products.map((product) =>
+          product.id === action.command.product.id
+            ? { ...product, currentStock: inboundQuantity }
+            : product,
+        ),
+        inventoryFlows: [...newFlows, ...state.inventoryFlows],
       };
     }
     default:
@@ -68,6 +118,8 @@ interface BusinessContextValue extends BusinessState {
   productionInbound: (command: ProductionInboundCommand) => void;
   /** 便捷方法：手工入库 */
   manualInbound: (command: ManualInboundCommand) => void;
+  addProduct: (product: Product) => void;
+  newProductInbound: (command: NewProductInboundCommand) => void;
 }
 
 const BusinessContext = createContext<BusinessContextValue | null>(null);
@@ -83,8 +135,23 @@ export function BusinessProvider({ children }: { children: ReactNode }) {
     dispatch({ type: 'MANUAL_INBOUND', command });
   };
 
+  const addProduct = (product: Product) => {
+    dispatch({ type: 'ADD_PRODUCT', product });
+  };
+
+  const newProductInbound = (command: NewProductInboundCommand) => {
+    dispatch({ type: 'NEW_PRODUCT_INBOUND', command });
+  };
+
   return (
-    <BusinessContext.Provider value={{ ...state, dispatch, productionInbound, manualInbound }}>
+    <BusinessContext.Provider value={{
+      ...state,
+      dispatch,
+      productionInbound,
+      manualInbound,
+      addProduct,
+      newProductInbound,
+    }}>
       {children}
     </BusinessContext.Provider>
   );

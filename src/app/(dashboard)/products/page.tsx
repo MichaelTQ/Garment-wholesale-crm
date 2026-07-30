@@ -2,28 +2,64 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
-import { Label } from '@/components/ui/label';
-import { Search, Plus, Eye, Edit, Trash2 } from 'lucide-react';
-import { products, formatCurrency, getStatusColor } from '@/lib/mock-data';
+import { Search, Plus, Eye, Edit } from 'lucide-react';
+import { formatCurrency, getStatusColor } from '@/lib/mock-data';
 import { toast } from 'sonner';
+import { useBusinessState } from '@/lib/state/provider';
+import { ProductFormFields } from '@/components/products/product-form-fields';
+import {
+  emptyProductFormValue,
+  productFromFormValue,
+  splitFormList,
+  type ProductFormValue,
+} from '@/lib/types/product';
 
-const categories = [...new Set(products.map(p => p.category))];
 const statusOptions = ['全部', '设计中', '生产中', '已上新', '正常销售', '库存不足', '已停售'];
 
 export default function ProductsPage() {
+  const { products, addProduct } = useBusinessState();
   const [search, setSearch] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('全部');
   const [statusFilter, setStatusFilter] = useState('全部');
   const [showAddDialog, setShowAddDialog] = useState(false);
+  const [productForm, setProductForm] = useState<ProductFormValue>(emptyProductFormValue);
+  const [formErrors, setFormErrors] = useState<string[]>([]);
   const [currentPage, setCurrentPage] = useState(1);
   const pageSize = 10;
+  const categories = [...new Set(products.map((product) => product.category))];
+
+  const handleAddProduct = () => {
+    const errors: string[] = [];
+    if (!productForm.styleNo.trim()) errors.push('请输入款号');
+    if (products.some((product) => product.styleNo.toLowerCase() === productForm.styleNo.trim().toLowerCase())) {
+      errors.push('该款号已经存在');
+    }
+    if (!productForm.name.trim()) errors.push('请输入商品名称');
+    if (!productForm.category) errors.push('请选择商品分类');
+    if (productForm.suggestedPrice < 0) errors.push('建议销售价不能为负数');
+    if (splitFormList(productForm.colors).length === 0) errors.push('请至少填写一种颜色');
+    if (splitFormList(productForm.sizes).length === 0) errors.push('请至少填写一个尺码');
+    if (errors.length > 0) {
+      setFormErrors(errors);
+      return;
+    }
+
+    addProduct(productFromFormValue(
+      productForm,
+      `p-${productForm.styleNo.trim().toLowerCase().replace(/[^a-z0-9]+/g, '-')}`,
+    ));
+    setShowAddDialog(false);
+    setFormErrors([]);
+    setProductForm(emptyProductFormValue);
+    toast.success('商品创建成功');
+  };
 
   const filtered = products.filter(p => {
     const matchSearch = !search || p.styleNo.toLowerCase().includes(search.toLowerCase()) || p.name.includes(search);
@@ -141,51 +177,27 @@ export default function ProductsPage() {
 
       {/* Add Product Dialog */}
       <Dialog open={showAddDialog} onOpenChange={setShowAddDialog}>
-        <DialogContent className="max-w-lg">
+        <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>新增商品</DialogTitle>
           </DialogHeader>
-          <div className="grid gap-4 py-4">
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label>款号 *</Label>
-                <Input placeholder="如：HJ-006" />
+          <div className="py-4">
+            <ProductFormFields
+              value={productForm}
+              onChange={setProductForm}
+              categories={categories}
+            />
+            {formErrors.length > 0 && (
+              <div className="mt-4 rounded-md border border-red-200 bg-red-50 p-3">
+                {formErrors.map((error) => (
+                  <p key={error} className="text-sm text-red-700">{error}</p>
+                ))}
               </div>
-              <div className="space-y-2">
-                <Label>商品名称 *</Label>
-                <Input placeholder="请输入商品名称" />
-              </div>
-            </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label>分类 *</Label>
-                <Select><SelectTrigger><SelectValue placeholder="选择分类" /></SelectTrigger>
-                  <SelectContent>{categories.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}</SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-2">
-                <Label>建议销售价 *</Label>
-                <Input type="number" placeholder="0" />
-              </div>
-            </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label>颜色</Label>
-                <Input placeholder="用逗号分隔，如：深蓝,黑色" />
-              </div>
-              <div className="space-y-2">
-                <Label>尺码</Label>
-                <Input placeholder="用逗号分隔，如：S,M,L,XL" />
-              </div>
-            </div>
-            <div className="space-y-2">
-              <Label>商品描述</Label>
-              <textarea className="w-full rounded-md border border-[#e5e7eb] px-3 py-2 text-sm" rows={2} placeholder="商品描述..." />
-            </div>
+            )}
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowAddDialog(false)}>取消</Button>
-            <Button className="bg-[#1e3a5f] hover:bg-[#2d5a8e]" onClick={() => { setShowAddDialog(false); toast.success('商品创建成功'); }}>保存</Button>
+            <Button className="bg-[#1e3a5f] hover:bg-[#2d5a8e]" onClick={handleAddProduct}>保存</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

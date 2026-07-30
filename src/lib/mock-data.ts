@@ -38,6 +38,7 @@ export interface Product {
   newDate: string;
   status: '设计中' | '生产中' | '已上新' | '正常销售' | '库存不足' | '已停售';
   description: string;
+  notes?: string;
 }
 
 export interface Warehouse {

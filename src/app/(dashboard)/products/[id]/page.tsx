@@ -5,12 +5,14 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { ArrowLeft } from 'lucide-react';
-import { products, productionBatches, formatCurrency, getStatusColor } from '@/lib/mock-data';
+import { formatCurrency, getStatusColor } from '@/lib/mock-data';
 import { useParams, useRouter } from 'next/navigation';
+import { useBusinessState } from '@/lib/state/provider';
 
 export default function ProductDetailPage() {
   const params = useParams();
   const router = useRouter();
+  const { products, productionBatches } = useBusinessState();
   const productId = params.id as string;
   const product = products.find(p => p.id === productId);
 
