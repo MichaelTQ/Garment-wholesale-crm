@@ -1,16 +1,13 @@
 'use client';
 
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { ArrowDownRight, ArrowUpRight, DollarSign, TrendingUp, TrendingDown, BarChart3 } from 'lucide-react';
-import { customers, orders, products, productionBatches, shipments, formatCurrency, getStatusColor } from '@/lib/mock-data';
+import { ArrowDownRight, DollarSign, TrendingUp, BarChart3 } from 'lucide-react';
+import { customers, orders, products, productionBatches, shipments, monthlySalesData, formatCurrency } from '@/lib/mock-data';
 
 // Calculate financial data
 const totalSales = orders.reduce((s, o) => s + o.totalAmount, 0);
-const totalPaid = orders.reduce((s, o) => s + o.paidAmount, 0);
 const totalReceivable = customers.reduce((s, c) => s + c.shippedDebt, 0);
 const totalOrderReceivable = customers.reduce((s, c) => s + c.orderReceivable, 0);
 const totalPreDeposit = customers.reduce((s, c) => s + c.preDeposit, 0);
@@ -27,21 +24,7 @@ const profitRate = totalSales > 0 ? ((totalProfit / totalSales) * 100).toFixed(1
 // Factory payables
 const totalFactoryPayable = productionBatches.reduce((s, b) => s + b.unpaidAmount, 0);
 
-// Monthly trend data (mock)
-const monthlyData = [
-  { month: '2024-07', sales: 215000, cost: 135000, profit: 80000 },
-  { month: '2024-08', sales: 198000, cost: 122000, profit: 76000 },
-  { month: '2024-09', sales: 245000, cost: 152000, profit: 93000 },
-  { month: '2024-10', sales: 310000, cost: 195000, profit: 115000 },
-  { month: '2024-11', sales: 275000, cost: 168000, profit: 107000 },
-  { month: '2024-12', sales: 286500, cost: 178500, profit: 108000 },
-  { month: '2025-01', sales: 320000, cost: 198000, profit: 122000 },
-  { month: '2025-02', sales: 265000, cost: 162000, profit: 103000 },
-  { month: '2025-03', sales: 340000, cost: 208000, profit: 132000 },
-  { month: '2025-04', sales: 298000, cost: 185000, profit: 113000 },
-  { month: '2025-05', sales: 355000, cost: 220000, profit: 135000 },
-  { month: '2025-06', sales: 286500, cost: 178500, profit: 108000 },
-];
+const monthlyData = monthlySalesData;
 
 // Customer profit ranking
 const customerProfitData = customers.map(c => {
@@ -61,7 +44,7 @@ const productProfitData = products.slice(0, 15).map(p => {
   return { ...p, soldQty, sales, cost, profit, rate: sales > 0 ? ((profit / sales) * 100).toFixed(1) : '0' };
 }).sort((a, b) => b.profit - a.profit);
 
-const maxSales = Math.max(...monthlyData.map(d => d.sales));
+const maxSales = Math.max(1, ...monthlyData.map(d => d.sales));
 
 export default function FinancePage() {
   return (

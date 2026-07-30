@@ -2,6 +2,16 @@ import type { Product } from '@/lib/mock-data';
 
 export type ProductStatus = Product['status'];
 
+export const DEFAULT_PRODUCT_CATEGORIES = [
+  '牛仔裤',
+  'T恤',
+  '连衣裙',
+  '卫衣',
+  '外套',
+  '半裙',
+  '其他',
+] as const;
+
 export interface ProductFormValue {
   styleNo: string;
   name: string;
@@ -80,4 +90,3 @@ export function productFromFormValue(
     notes: value.notes.trim(),
   };
 }
-

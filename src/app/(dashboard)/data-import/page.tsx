@@ -3,13 +3,9 @@
 import { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Upload, FileSpreadsheet, AlertCircle, CheckCircle2, ArrowRight } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -24,45 +20,12 @@ const importTypes = [
 ];
 
 const mockPreviewData: Record<string, string[][]> = {
-  customers: [
-    ['客户名称', '国家', 'WhatsApp', '常买品类'],
-    ['ABC Trading Co.', 'Nigeria', '+234 8012345678', '牛仔裤,连衣裙'],
-    ['Lagos Fashion Hub', 'Nigeria', '+234 8098765432', 'T恤,短裤'],
-    ['Accra Styles Ltd', 'Ghana', '+233 201234567', '连衣裙,半身裙'],
-    ['Nairobi Textiles', 'Kenya', '+254 712345678', '牛仔裤,外套'],
-    ['Dar Styles Co.', 'Tanzania', '+255 713456789', 'T恤,连衣裙'],
-    ['Kampala Wear', 'Uganda', '+256 771234567', '短裤,运动服'],
-    ['Douala Fashion', 'Cameroon', '+237 671234567', '连衣裙,半身裙'],
-    ['Dakar Styles', 'Senegal', '+221 771234567', '牛仔裤,T恤'],
-    ['Cape Wear Ltd', 'South Africa', '+27 821234567', '外套,连衣裙'],
-    ['Abidjan Fashion', 'Côte d\'Ivoire', '+225 071234567', 'T恤,短裤'],
-  ],
-  products: [
-    ['款号', '商品名称', '分类', '颜色', '尺码'],
-    ['HJ-001', '经典直筒牛仔裤', '牛仔裤', '深蓝', 'S,M,L,XL,XXL'],
-    ['HJ-002', '修身显瘦牛仔裤', '牛仔裤', '黑色', 'S,M,L,XL'],
-    ['HL-001', '碎花雪纺连衣裙', '连衣裙', '红色', 'S,M,L'],
-    ['HT-001', '纯棉圆领T恤', 'T恤', '白色', 'S,M,L,XL,XXL'],
-    ['HD-001', '高腰A字半身裙', '半身裙', '卡其色', 'S,M,L,XL'],
-  ],
-  inventory: [
-    ['款号', '颜色', '尺码', '仓库', '数量'],
-    ['HJ-001', '深蓝', 'M', '广州白云仓', '580'],
-    ['HJ-001', '深蓝', 'L', '广州白云仓', '420'],
-    ['HJ-002', '黑色', 'S', '广州白云仓', '310'],
-    ['HL-001', '红色', 'M', '佛山南海仓', '260'],
-    ['HT-001', '白色', 'L', '广州白云仓', '490'],
-    ['HT-001', '白色', 'XL', '广州白云仓', '380'],
-    ['HD-001', '卡其色', 'S', '东莞虎门仓', '220'],
-  ],
+  customers: [['客户名称', '国家', 'WhatsApp', '常买品类']],
+  products: [['款号', '商品名称', '分类', '颜色', '尺码']],
+  inventory: [['款号', '颜色', '尺码', '仓库', '数量']],
 };
 
-const mockErrors = [
-  { row: 3, field: 'WhatsApp', message: 'WhatsApp号码格式错误' },
-  { row: 7, field: '金额', message: '金额为空' },
-  { row: 12, field: '客户名称', message: '客户名称重复' },
-  { row: 15, field: '日期', message: '日期格式错误' },
-];
+const mockErrors: Array<{ row: number; field: string; message: string }> = [];
 
 export default function DataImportPage() {
   const [selectedType, setSelectedType] = useState<string | null>(null);
@@ -73,13 +36,13 @@ export default function DataImportPage() {
   const [importComplete, setImportComplete] = useState(false);
 
   const handleUpload = () => {
-    setUploadedFile('客户资料_20250615.xlsx');
+    setUploadedFile('待导入文件.xlsx');
     setShowPreview(true);
   };
 
   const handleConfirmImport = () => {
     setImportComplete(true);
-    toast.success('数据导入成功！已导入 18 条记录。');
+    toast.success('模拟导入流程已完成，未写入业务数据。');
   };
 
   const handleReset = () => {
@@ -242,15 +205,15 @@ export default function DataImportPage() {
                     <div className="flex items-center gap-4">
                       <div className="flex items-center gap-2 text-sm">
                         <CheckCircle2 className="h-4 w-4 text-green-600" />
-                        <span>有效数据：<span className="font-medium text-green-600">18条</span></span>
+                        <span>有效数据：<span className="font-medium text-green-600">0条</span></span>
                       </div>
                       <div className="flex items-center gap-2 text-sm">
                         <AlertCircle className="h-4 w-4 text-red-500" />
-                        <span>错误数据：<span className="font-medium text-red-500">4条</span></span>
+                        <span>错误数据：<span className="font-medium text-red-500">0条</span></span>
                       </div>
                       <div className="flex items-center gap-2 text-sm">
                         <AlertCircle className="h-4 w-4 text-yellow-500" />
-                        <span>重复数据：<span className="font-medium text-yellow-500">2条</span></span>
+                        <span>重复数据：<span className="font-medium text-yellow-500">0条</span></span>
                       </div>
                     </div>
                     
@@ -284,7 +247,7 @@ export default function DataImportPage() {
               <CardContent className="p-8 text-center">
                 <CheckCircle2 className="h-16 w-16 text-green-500 mx-auto mb-4" />
                 <h3 className="text-lg font-semibold mb-2">导入完成</h3>
-                <p className="text-sm text-muted-foreground mb-4">已成功导入 18 条记录，跳过 4 条错误数据</p>
+                <p className="text-sm text-muted-foreground mb-4">模拟流程完成，当前没有写入任何业务记录</p>
                 <Button size="sm" className="bg-[#1e3a5f] hover:bg-[#2d5a8e]" onClick={handleReset}>
                   继续导入
                 </Button>
@@ -310,22 +273,9 @@ export default function DataImportPage() {
                 </TableHeader>
                 <TableBody>
                   <TableRow>
-                    <TableCell className="text-xs">2025-06-10 14:30</TableCell>
-                    <TableCell className="text-xs">客户资料</TableCell>
-                    <TableCell className="text-xs">客户资料_20250610.xlsx</TableCell>
-                    <TableCell className="text-xs text-right">25</TableCell>
-                    <TableCell className="text-xs text-right text-green-600">22</TableCell>
-                    <TableCell className="text-xs text-right text-red-500">3</TableCell>
-                    <TableCell className="text-center"><Badge variant="secondary" className="text-[10px] bg-green-50 text-green-700">完成</Badge></TableCell>
-                  </TableRow>
-                  <TableRow>
-                    <TableCell className="text-xs">2025-05-28 10:15</TableCell>
-                    <TableCell className="text-xs">库存数据</TableCell>
-                    <TableCell className="text-xs">库存盘点_0528.xlsx</TableCell>
-                    <TableCell className="text-xs text-right">50</TableCell>
-                    <TableCell className="text-xs text-right text-green-600">48</TableCell>
-                    <TableCell className="text-xs text-right text-red-500">2</TableCell>
-                    <TableCell className="text-center"><Badge variant="secondary" className="text-[10px] bg-green-50 text-green-700">完成</Badge></TableCell>
+                    <TableCell colSpan={7} className="py-10 text-center text-sm text-muted-foreground">
+                      暂无导入历史
+                    </TableCell>
                   </TableRow>
                 </TableBody>
               </Table>

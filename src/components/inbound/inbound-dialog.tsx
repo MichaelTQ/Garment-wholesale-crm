@@ -20,6 +20,7 @@ import {
 } from '@/lib/services/inventory';
 import {
   emptyProductFormValue,
+  DEFAULT_PRODUCT_CATEGORIES,
   productFromFormValue,
   productToFormValue,
   splitFormList,
@@ -98,7 +99,10 @@ export function InboundDialog({ open, onOpenChange, defaultBatchId }: InboundDia
   const [submitting, setSubmitting] = useState(false);
 
   const categories = useMemo(
-    () => [...new Set(products.map((product) => product.category))],
+    () => [...new Set([
+      ...DEFAULT_PRODUCT_CATEGORIES,
+      ...products.map((product) => product.category),
+    ])],
     [products],
   );
   const selectedBatch = productionBatches.find((batch) => batch.id === formData.batchId);

@@ -4,32 +4,32 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { TrendingUp, DollarSign, Package, AlertTriangle, ShoppingCart, Warehouse } from 'lucide-react';
-import { customers, orders, inventoryRecords, monthlySalesData, formatCurrency, getStatusColor } from '@/lib/mock-data';
+import { TrendingUp, DollarSign, Package, AlertTriangle, ShoppingCart } from 'lucide-react';
+import { customers, orders, monthlySalesData, formatCurrency, getStatusColor } from '@/lib/mock-data';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
 import Link from 'next/link';
-
-const statsCards = [
-  { title: '本月销售额', value: '¥286,500', icon: DollarSign, color: 'text-[#1e3a5f]', bg: 'bg-[#e8eef6]' },
-  { title: '本月销售利润', value: '¥82,300', icon: TrendingUp, color: 'text-green-600', bg: 'bg-green-50' },
-  { title: '客户应收总额', value: '¥765,240', icon: DollarSign, color: 'text-orange-600', bg: 'bg-orange-50' },
-  { title: '已发货实际欠款', value: '¥438,600', icon: DollarSign, color: 'text-red-600', bg: 'bg-red-50' },
-  { title: '工厂应付款', value: '¥316,800', icon: DollarSign, color: 'text-purple-600', bg: 'bg-purple-50' },
-  { title: '当前库存', value: '18,560件', icon: Package, color: 'text-[#1e3a5f]', bg: 'bg-[#e8eef6]' },
-];
-
-const alertCards = [
-  { title: '待发货订单', value: '12单', icon: ShoppingCart, color: 'text-orange-600', bg: 'bg-orange-50', border: 'border-orange-200' },
-  { title: '低库存商品', value: '8款', icon: AlertTriangle, color: 'text-red-600', bg: 'bg-red-50', border: 'border-red-200' },
-];
-
-const lowStockItems = inventoryRecords.filter(r => r.status === '低库存' || r.status === '缺货');
+import { useBusinessState } from '@/lib/state/provider';
 
 const topDebtCustomers = [...customers]
   .sort((a, b) => b.shippedDebt - a.shippedDebt)
   .slice(0, 5);
 
 export default function DashboardPage() {
+  const { inventoryRecords, productionBatches } = useBusinessState();
+  const lowStockItems = inventoryRecords.filter(r => r.status === '低库存' || r.status === '缺货');
+  const statsCards = [
+    { title: '本月销售额', value: formatCurrency(orders.reduce((sum, order) => sum + order.totalAmount, 0)), icon: DollarSign, color: 'text-[#1e3a5f]', bg: 'bg-[#e8eef6]' },
+    { title: '本月销售利润', value: formatCurrency(monthlySalesData.at(-1)?.profit ?? 0), icon: TrendingUp, color: 'text-green-600', bg: 'bg-green-50' },
+    { title: '客户应收总额', value: formatCurrency(customers.reduce((sum, customer) => sum + customer.orderReceivable, 0)), icon: DollarSign, color: 'text-orange-600', bg: 'bg-orange-50' },
+    { title: '已发货实际欠款', value: formatCurrency(customers.reduce((sum, customer) => sum + customer.shippedDebt, 0)), icon: DollarSign, color: 'text-red-600', bg: 'bg-red-50' },
+    { title: '工厂应付款', value: formatCurrency(productionBatches.reduce((sum, batch) => sum + batch.unpaidAmount, 0)), icon: DollarSign, color: 'text-purple-600', bg: 'bg-purple-50' },
+    { title: '当前库存', value: `${inventoryRecords.reduce((sum, record) => sum + record.actualStock, 0).toLocaleString('zh-CN')}件`, icon: Package, color: 'text-[#1e3a5f]', bg: 'bg-[#e8eef6]' },
+  ];
+  const alertCards = [
+    { title: '待发货订单', value: `${orders.filter((order) => ['已确认', '部分发货'].includes(order.status)).length}单`, icon: ShoppingCart, color: 'text-orange-600', bg: 'bg-orange-50', border: 'border-orange-200' },
+    { title: '低库存商品', value: `${lowStockItems.length}款`, icon: AlertTriangle, color: 'text-red-600', bg: 'bg-red-50', border: 'border-red-200' },
+  ];
+
   return (
     <div className="space-y-6">
       {/* Welcome */}

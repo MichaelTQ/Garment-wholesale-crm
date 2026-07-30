@@ -16,6 +16,7 @@ import { useBusinessState } from '@/lib/state/provider';
 import { ProductFormFields } from '@/components/products/product-form-fields';
 import {
   emptyProductFormValue,
+  DEFAULT_PRODUCT_CATEGORIES,
   productFromFormValue,
   splitFormList,
   type ProductFormValue,
@@ -33,7 +34,10 @@ export default function ProductsPage() {
   const [formErrors, setFormErrors] = useState<string[]>([]);
   const [currentPage, setCurrentPage] = useState(1);
   const pageSize = 10;
-  const categories = [...new Set(products.map((product) => product.category))];
+  const categories = [...new Set([
+    ...DEFAULT_PRODUCT_CATEGORIES,
+    ...products.map((product) => product.category),
+  ])];
 
   const handleAddProduct = () => {
     const errors: string[] = [];
