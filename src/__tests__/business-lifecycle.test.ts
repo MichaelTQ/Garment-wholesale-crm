@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   addCustomerTransaction,
   addFactoryTransaction,
+  applyDepositTransaction,
   createFactoryPaymentTransaction,
   createOrderTransaction,
   createPaymentTransaction,
@@ -57,6 +58,7 @@ function emptyState(): BusinessState {
     shipments: [],
     payments: [],
     paymentAllocations: [],
+    depositApplications: [],
     customerLedgers: {},
   };
 }
@@ -249,5 +251,79 @@ describe('完整业务生命周期', () => {
     expect(state.factories[0].paidAmount).toBe(300);
     expect(state.factories[0].unpaidAmount).toBe(500);
     expect(state.factoryPayments).toHaveLength(1);
+  });
+
+  it('客户预存款与订单欠款相等时可以一次抵扣结清', () => {
+    let state = addCustomerTransaction(
+      emptyState(),
+      {
+        name: 'Deposit Buyer',
+        country: '肯尼亚',
+        city: 'Nairobi',
+        whatsapp: '+2541000000',
+        frequentCategories: [],
+        notes: '',
+      },
+      '2026-07-30T08:00:00.000Z',
+    );
+    const customerId = state.customers[0].id;
+    state = createPaymentTransaction(
+      state,
+      {
+        customerId,
+        paymentDate: '2026-07-30',
+        amount: 200,
+        method: '银行转账',
+        relatedOrderId: '',
+        voucher: '',
+        notes: '预存',
+      },
+      '2026-07-30T08:30:00.000Z',
+    ).state;
+    expect(state.customers[0].presaveBalance).toBe(200);
+
+    const orderResult = createOrderTransaction(
+      state,
+      {
+        customerId,
+        orderDate: '2026-07-31',
+        items: [
+          {
+            productId: 'prd-1',
+            styleNo: 'ST-001',
+            productName: '测试商品',
+            color: '黑色',
+            size: 'M',
+            warehouseId: 'wh1',
+            warehouseName: '测试仓',
+            quantity: 10,
+            unitPrice: 20,
+          },
+        ],
+        notes: '',
+        confirm: true,
+        depositDeduction: 0,
+      },
+      '2026-07-31T09:00:00.000Z',
+    );
+    state = orderResult.state;
+    expect(state.orders[0].unpaidAmount).toBe(200);
+
+    state = applyDepositTransaction(
+      state,
+      {
+        customerId,
+        orderId: orderResult.orderId,
+        applicationDate: '2026-07-31',
+        amount: 200,
+        notes: '',
+      },
+      '2026-07-31T10:00:00.000Z',
+    ).state;
+    expect(state.customers[0].presaveBalance).toBe(0);
+    expect(state.orders[0].paidAmount).toBe(200);
+    expect(state.orders[0].unpaidAmount).toBe(0);
+    expect(state.depositApplications).toHaveLength(1);
+    expect(state.customerLedgers[customerId][0].businessType).toBe('预存款抵扣');
   });
 });

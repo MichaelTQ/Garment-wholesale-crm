@@ -16,6 +16,7 @@ import type {
   Shipment,
 } from '@/lib/mock-data';
 import type {
+  ApplyDepositCommand,
   BusinessState,
   CreateFactoryPaymentCommand,
   CreateOrderCommand,
@@ -71,6 +72,7 @@ function cloneState(state: BusinessState): BusinessState {
     })),
     payments: state.payments.map((item) => ({ ...item })),
     paymentAllocations: state.paymentAllocations.map((item) => ({ ...item })),
+    depositApplications: state.depositApplications.map((item) => ({ ...item })),
     customerLedgers: Object.fromEntries(
       Object.entries(state.customerLedgers).map(([customerId, entries]) => [
         customerId,
@@ -926,6 +928,68 @@ export function createPaymentTransaction(
     notes: command.notes.trim(),
   });
   return { state: deriveBusinessState(derived), paymentId };
+}
+
+export function applyDepositTransaction(
+  state: BusinessState,
+  command: ApplyDepositCommand,
+  createdAt: string,
+): { state: BusinessState; applicationId: string } {
+  if (!Number.isFinite(command.amount) || command.amount <= 0) {
+    throw new Error('抵扣金额必须大于 0');
+  }
+  const next = cloneState(state);
+  const customer = next.customers.find((item) => item.id === command.customerId);
+  if (!customer) throw new Error('请选择有效客户');
+  const order = next.orders.find(
+    (item) =>
+      item.id === command.orderId &&
+      item.customerId === customer.id &&
+      ACTIVE_ORDER_STATUSES.includes(item.status),
+  );
+  if (!order) throw new Error('请选择该客户的有效欠款订单');
+  if (order.unpaidAmount <= 0) throw new Error('该订单已经结清，无需抵扣');
+  if (command.amount > customer.presaveBalance) {
+    throw new Error(`抵扣金额不能超过客户预存余额 ${customer.presaveBalance}`);
+  }
+  if (command.amount > order.unpaidAmount) {
+    throw new Error(`抵扣金额不能超过订单未收金额 ${order.unpaidAmount}`);
+  }
+
+  customer.presaveBalance -= command.amount;
+  order.paidAmount += command.amount;
+  order.presaveDeduction += command.amount;
+  order.updatedAt = createdAt;
+  const applicationId = createBusinessId('dep');
+  next.depositApplications.unshift({
+    id: applicationId,
+    applicationNo: createDocumentNo(
+      'DEP',
+      command.applicationDate,
+      next.depositApplications.length,
+    ),
+    customerId: customer.id,
+    customerName: customer.name,
+    orderId: order.id,
+    orderNo: order.orderNo,
+    applicationDate: command.applicationDate,
+    amount: command.amount,
+    notes: command.notes.trim(),
+    createdAt,
+  });
+
+  const derived = deriveBusinessState(next);
+  appendLedger(derived, customer.id, {
+    date: command.applicationDate,
+    businessType: '预存款抵扣',
+    docNo: next.depositApplications[0].applicationNo,
+    description: `使用预存款抵扣订单 ${order.orderNo}`,
+    increaseReceivable: 0,
+    receivedAmount: command.amount,
+    depositChange: -command.amount,
+    notes: command.notes.trim(),
+  });
+  return { state: deriveBusinessState(derived), applicationId };
 }
 
 export function transferStockTransaction(

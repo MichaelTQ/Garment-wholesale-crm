@@ -30,6 +30,7 @@ import {
   addCustomerTransaction,
   addFactoryTransaction,
   addProductTransaction,
+  applyDepositTransaction,
   cancelOrderTransaction,
   confirmOrderTransaction,
   createFactoryPaymentTransaction,
@@ -45,6 +46,7 @@ import {
   registerProductionInbound,
 } from '@/lib/services/inventory';
 import type {
+  ApplyDepositCommand,
   CreateOrderCommand,
   CreateFactoryPaymentCommand,
   CreatePaymentCommand,
@@ -107,6 +109,7 @@ function createInitialState(): BusinessState {
     })),
     payments: initialPayments.map((item) => ({ ...item })),
     paymentAllocations: [],
+    depositApplications: [],
     customerLedgers: Object.fromEntries(
       Object.entries(initialCustomerLedgers).map(([customerId, entries]) => [
         customerId,
@@ -151,6 +154,9 @@ function normalizeStoredState(value: unknown): BusinessState | null {
     paymentAllocations: Array.isArray(stored.paymentAllocations)
       ? stored.paymentAllocations
       : [],
+    depositApplications: Array.isArray(stored.depositApplications)
+      ? stored.depositApplications
+      : [],
     customerLedgers:
       stored.customerLedgers && typeof stored.customerLedgers === 'object'
         ? stored.customerLedgers
@@ -173,6 +179,7 @@ interface BusinessContextValue extends BusinessState {
   cancelOrder: (orderId: string) => BusinessOperationResult;
   createShipment: (command: CreateShipmentCommand) => BusinessOperationResult;
   createPayment: (command: CreatePaymentCommand) => BusinessOperationResult;
+  applyDeposit: (command: ApplyDepositCommand) => BusinessOperationResult;
   transferStock: (command: TransferStockCommand) => BusinessOperationResult;
   resetBusinessData: () => void;
 }
@@ -405,6 +412,26 @@ export function BusinessProvider({ children }: { children: ReactNode }) {
     [replaceState],
   );
 
+  const applyDeposit = useCallback(
+    (command: ApplyDepositCommand): BusinessOperationResult => {
+      try {
+        const result = applyDepositTransaction(
+          stateRef.current,
+          command,
+          new Date().toISOString(),
+        );
+        replaceState(result.state);
+        return { ok: true, id: result.applicationId };
+      } catch (error: unknown) {
+        return {
+          ok: false,
+          error: error instanceof Error ? error.message : '预存款抵扣失败',
+        };
+      }
+    },
+    [replaceState],
+  );
+
   const transferStock = useCallback(
     (command: TransferStockCommand): BusinessOperationResult =>
       runTransaction((current) => transferStockTransaction(current, command)),
@@ -435,6 +462,7 @@ export function BusinessProvider({ children }: { children: ReactNode }) {
       cancelOrder,
       createShipment,
       createPayment,
+      applyDeposit,
       transferStock,
       resetBusinessData,
     }),
@@ -454,6 +482,7 @@ export function BusinessProvider({ children }: { children: ReactNode }) {
       cancelOrder,
       createShipment,
       createPayment,
+      applyDeposit,
       transferStock,
       resetBusinessData,
     ],

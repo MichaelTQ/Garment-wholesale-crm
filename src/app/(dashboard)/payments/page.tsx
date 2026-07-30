@@ -15,12 +15,21 @@ import { formatCurrency, type Payment } from '@/lib/mock-data';
 import { useBusinessState } from '@/lib/state/provider';
 
 const paymentMethods: Payment['method'][] = ['银行转账', '微信', '支付宝', '现金', '其他'];
+type EntryType = 'cash' | 'deposit';
 
 export default function PaymentsPage() {
-  const { payments, customers, orders, createPayment } = useBusinessState();
+  const {
+    payments,
+    depositApplications,
+    customers,
+    orders,
+    createPayment,
+    applyDeposit,
+  } = useBusinessState();
   const [search, setSearch] = useState('');
   const [methodFilter, setMethodFilter] = useState('全部');
   const [showAddDialog, setShowAddDialog] = useState(false);
+  const [entryType, setEntryType] = useState<EntryType>('cash');
   const [selectedCustomerId, setSelectedCustomerId] = useState('');
   const [paymentDate, setPaymentDate] = useState('');
   const [amount, setAmount] = useState(0);
@@ -54,9 +63,11 @@ export default function PaymentsPage() {
   );
   const customerUnpaid = customerOrders.reduce((sum, order) => sum + order.unpaidAmount, 0);
   const expectedDeposit = Math.max(0, amount - customerUnpaid);
+  const selectedOrder = customerOrders.find((order) => order.id === relatedOrderId);
 
   const resetForm = () => {
     setSelectedCustomerId('');
+    setEntryType('cash');
     setAmount(0);
     setMethod('银行转账');
     setRelatedOrderId('auto');
@@ -65,6 +76,24 @@ export default function PaymentsPage() {
   };
 
   const submitPayment = () => {
+    if (entryType === 'deposit') {
+      const result = applyDeposit({
+        customerId: selectedCustomerId,
+        orderId: relatedOrderId,
+        applicationDate: paymentDate,
+        amount,
+        notes,
+      });
+      if (!result.ok) {
+        toast.error(result.error);
+        return;
+      }
+      setShowAddDialog(false);
+      resetForm();
+      toast.success('预存款抵扣成功，客户余额和订单欠款已同步更新');
+      return;
+    }
+
     const result = createPayment({
       customerId: selectedCustomerId,
       paymentDate,
@@ -162,6 +191,46 @@ export default function PaymentsPage() {
         </CardContent>
       </Card>
 
+      <Card className="shadow-sm">
+        <CardContent className="p-0">
+          <div className="border-b p-4">
+            <h3 className="font-medium">预存款抵扣记录</h3>
+            <p className="mt-1 text-xs text-muted-foreground">抵扣不是新的现金收款，因此单独记录</p>
+          </div>
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead className="text-xs">抵扣编号</TableHead>
+                <TableHead className="text-xs">客户</TableHead>
+                <TableHead className="text-xs">抵扣日期</TableHead>
+                <TableHead className="text-xs">对应订单</TableHead>
+                <TableHead className="text-right text-xs">抵扣金额</TableHead>
+                <TableHead className="text-xs">备注</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {depositApplications.map((application) => (
+                <TableRow key={application.id}>
+                  <TableCell className="text-xs font-medium">{application.applicationNo}</TableCell>
+                  <TableCell className="text-xs">
+                    <Link href={`/customers/${application.customerId}`} className="hover:underline">{application.customerName}</Link>
+                  </TableCell>
+                  <TableCell className="text-xs">{application.applicationDate}</TableCell>
+                  <TableCell className="text-xs">{application.orderNo}</TableCell>
+                  <TableCell className="text-right text-xs font-medium tabular-nums text-blue-600">{formatCurrency(application.amount)}</TableCell>
+                  <TableCell className="text-xs">{application.notes || '-'}</TableCell>
+                </TableRow>
+              ))}
+              {depositApplications.length === 0 && (
+                <TableRow>
+                  <TableCell colSpan={6} className="h-20 text-center text-sm text-muted-foreground">暂无预存款抵扣记录</TableCell>
+                </TableRow>
+              )}
+            </TableBody>
+          </Table>
+        </CardContent>
+      </Card>
+
       <Dialog
         open={showAddDialog}
         onOpenChange={(open) => {
@@ -173,10 +242,28 @@ export default function PaymentsPage() {
           <DialogHeader><DialogTitle>新增收款</DialogTitle></DialogHeader>
           <div className="grid gap-4 py-4">
             <div className="space-y-2">
+              <Label>业务类型 *</Label>
+              <Select
+                value={entryType}
+                onValueChange={(value: EntryType) => {
+                  setEntryType(value);
+                  setAmount(0);
+                  setRelatedOrderId(value === 'cash' ? 'auto' : '');
+                }}
+              >
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="cash">新增现金收款</SelectItem>
+                  <SelectItem value="deposit">使用预存款抵扣订单</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
               <Label>选择客户 *</Label>
               <Select value={selectedCustomerId} onValueChange={(value) => {
                 setSelectedCustomerId(value);
-                setRelatedOrderId('auto');
+                setRelatedOrderId(entryType === 'cash' ? 'auto' : '');
+                setAmount(0);
               }}>
                 <SelectTrigger><SelectValue placeholder="请选择客户" /></SelectTrigger>
                 <SelectContent>
@@ -193,30 +280,48 @@ export default function PaymentsPage() {
             )}
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label>收款日期 *</Label>
+                <Label>{entryType === 'deposit' ? '抵扣日期' : '收款日期'} *</Label>
                 <Input type="date" value={paymentDate} onChange={(event) => setPaymentDate(event.target.value)} />
               </div>
               <div className="space-y-2">
-                <Label>收款金额 *</Label>
-                <Input type="number" min={0} step="0.01" value={amount || ''} onChange={(event) => setAmount(Number(event.target.value))} />
+                <Label>{entryType === 'deposit' ? '抵扣金额' : '收款金额'} *</Label>
+                <Input
+                  type="number"
+                  min={0}
+                  max={entryType === 'deposit' ? Math.min(selectedCustomer?.presaveBalance ?? 0, selectedOrder?.unpaidAmount ?? Number.POSITIVE_INFINITY) : undefined}
+                  step="0.01"
+                  value={amount || ''}
+                  onChange={(event) => setAmount(Number(event.target.value))}
+                />
               </div>
             </div>
             <div className="grid grid-cols-2 gap-4">
+              {entryType === 'cash' && (
+                <div className="space-y-2">
+                  <Label>付款方式 *</Label>
+                  <Select value={method} onValueChange={(value: Payment['method']) => setMethod(value)}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      {paymentMethods.map((entry) => <SelectItem key={entry} value={entry}>{entry}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
               <div className="space-y-2">
-                <Label>付款方式 *</Label>
-                <Select value={method} onValueChange={(value: Payment['method']) => setMethod(value)}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
+                <Label>{entryType === 'deposit' ? '抵扣订单 *' : '优先核销订单'}</Label>
+                <Select
+                  value={relatedOrderId}
+                  onValueChange={(value) => {
+                    setRelatedOrderId(value);
+                    if (entryType === 'deposit') {
+                      const order = customerOrders.find((item) => item.id === value);
+                      setAmount(Math.min(selectedCustomer?.presaveBalance ?? 0, order?.unpaidAmount ?? 0));
+                    }
+                  }}
+                >
+                  <SelectTrigger><SelectValue placeholder={entryType === 'deposit' ? '请选择欠款订单' : undefined} /></SelectTrigger>
                   <SelectContent>
-                    {paymentMethods.map((entry) => <SelectItem key={entry} value={entry}>{entry}</SelectItem>)}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-2">
-                <Label>优先核销订单</Label>
-                <Select value={relatedOrderId} onValueChange={setRelatedOrderId}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="auto">自动按最早未收订单核销</SelectItem>
+                    {entryType === 'cash' && <SelectItem value="auto">自动按最早未收订单核销</SelectItem>}
                     {customerOrders.map((order) => (
                       <SelectItem key={order.id} value={order.id}>{order.orderNo} - {formatCurrency(order.unpaidAmount)}</SelectItem>
                     ))}
@@ -224,16 +329,25 @@ export default function PaymentsPage() {
                 </Select>
               </div>
             </div>
-            {amount > 0 && (
+            {amount > 0 && entryType === 'cash' && (
               <div className="rounded-md border border-blue-200 bg-blue-50 p-3 text-sm">
                 预计核销 {formatCurrency(Math.min(amount, customerUnpaid))}；
                 {expectedDeposit > 0 ? `超出的 ${formatCurrency(expectedDeposit)} 将自动成为客户预存款。` : '不会产生新增预存款。'}
               </div>
             )}
-            <div className="space-y-2">
-              <Label>凭证编号或图片地址</Label>
-              <Input value={voucher} onChange={(event) => setVoucher(event.target.value)} placeholder="可选" />
-            </div>
+            {entryType === 'deposit' && selectedOrder && (
+              <div className="rounded-md border border-blue-200 bg-blue-50 p-3 text-sm">
+                将使用 {formatCurrency(amount)} 预存款抵扣 {selectedOrder.orderNo}；
+                抵扣后预计剩余欠款 {formatCurrency(Math.max(0, selectedOrder.unpaidAmount - amount))}，
+                客户剩余预存款 {formatCurrency(Math.max(0, (selectedCustomer?.presaveBalance ?? 0) - amount))}。
+              </div>
+            )}
+            {entryType === 'cash' && (
+              <div className="space-y-2">
+                <Label>凭证编号或图片地址</Label>
+                <Input value={voucher} onChange={(event) => setVoucher(event.target.value)} placeholder="可选" />
+              </div>
+            )}
             <div className="space-y-2">
               <Label>备注</Label>
               <textarea className="w-full rounded-md border border-[#e5e7eb] px-3 py-2 text-sm" rows={2} value={notes} onChange={(event) => setNotes(event.target.value)} />
@@ -241,7 +355,9 @@ export default function PaymentsPage() {
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowAddDialog(false)}>取消</Button>
-            <Button className="bg-[#1e3a5f] hover:bg-[#2d5a8e]" onClick={submitPayment}>确认收款</Button>
+            <Button className="bg-[#1e3a5f] hover:bg-[#2d5a8e]" onClick={submitPayment}>
+              {entryType === 'deposit' ? '确认抵扣' : '确认收款'}
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

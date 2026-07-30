@@ -40,6 +40,19 @@ export interface PaymentAllocation {
   amount: number;
 }
 
+export interface DepositApplication {
+  id: string;
+  applicationNo: string;
+  customerId: string;
+  customerName: string;
+  orderId: string;
+  orderNo: string;
+  applicationDate: string;
+  amount: number;
+  notes: string;
+  createdAt: string;
+}
+
 export interface BusinessState {
   storageVersion: number;
   customers: Customer[];
@@ -55,6 +68,7 @@ export interface BusinessState {
   shipments: Shipment[];
   payments: Payment[];
   paymentAllocations: PaymentAllocation[];
+  depositApplications: DepositApplication[];
   customerLedgers: Record<string, CustomerLedger[]>;
 }
 
@@ -108,6 +122,14 @@ export interface CreatePaymentCommand {
   method: Payment['method'];
   relatedOrderId: string;
   voucher: string;
+  notes: string;
+}
+
+export interface ApplyDepositCommand {
+  customerId: string;
+  orderId: string;
+  applicationDate: string;
+  amount: number;
   notes: string;
 }
 

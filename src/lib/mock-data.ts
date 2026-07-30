@@ -207,7 +207,7 @@ export interface InventoryFlow {
 export interface CustomerLedger {
   id: string;
   date: string;
-  businessType: '订单' | '发货' | '收款' | '余额调整' | '期初余额';
+  businessType: '订单' | '发货' | '收款' | '预存款抵扣' | '余额调整' | '期初余额';
   docNo: string;
   description: string;
   increaseReceivable: number;
