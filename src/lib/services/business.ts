@@ -164,11 +164,14 @@ function deriveCustomer(customer: Customer, orders: Order[], payments: Payment[]
 
 export function deriveBusinessState(state: BusinessState): BusinessState {
   const orders = state.orders.map(deriveOrder);
-  const inventoryRecords = state.inventoryRecords.map((record) => ({
-    ...record,
-    sellableStock: calculateSellableStock(record.actualStock, record.reservedStock),
-    status: calcInventoryStatus(record.actualStock),
-  }));
+  const inventoryRecords = state.inventoryRecords.map((record) => {
+    const sellableStock = calculateSellableStock(record.actualStock, record.reservedStock);
+    return {
+      ...record,
+      sellableStock,
+      status: calcInventoryStatus(sellableStock),
+    };
+  });
   const products = state.products.map((product) => {
     const currentStock = inventoryRecords
       .filter((record) => record.styleNo === product.styleNo)
@@ -770,7 +773,7 @@ export function createShipmentTransaction(
     stock.actualStock -= input.quantity;
     stock.reservedStock -= input.quantity;
     stock.sellableStock = calculateSellableStock(stock.actualStock, stock.reservedStock);
-    stock.status = calcInventoryStatus(stock.actualStock);
+    stock.status = calcInventoryStatus(stock.sellableStock);
     orderItem.shippedQuantity += input.quantity;
     warehouseIds.add(orderItem.warehouseId);
     warehouseNames.add(orderItem.warehouseName);
@@ -1019,7 +1022,7 @@ export function transferStockTransaction(
   const sourceBefore = source.actualStock;
   source.actualStock -= command.quantity;
   source.sellableStock = calculateSellableStock(source.actualStock, source.reservedStock);
-  source.status = calcInventoryStatus(source.actualStock);
+  source.status = calcInventoryStatus(source.sellableStock);
 
   let target = next.inventoryRecords.find(
     (record) =>
@@ -1047,7 +1050,7 @@ export function transferStockTransaction(
   }
   target.actualStock += command.quantity;
   target.sellableStock = calculateSellableStock(target.actualStock, target.reservedStock);
-  target.status = calcInventoryStatus(target.actualStock);
+  target.status = calcInventoryStatus(target.sellableStock);
   const commonFlow = {
     date: command.date,
     type: '仓库调拨' as const,

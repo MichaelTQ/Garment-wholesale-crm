@@ -50,12 +50,12 @@ export function findInventoryIndex(records: InventoryRecord[], key: SkuKey): num
   );
 }
 
-/** 计算库存状态 */
-export function calcInventoryStatus(actualStock: number): InventoryRecord['status'] {
-  if (actualStock <= 0) return '缺货';
-  if (actualStock <= 10) return '低库存';
-  if (actualStock <= 50) return '偏低';
-  if (actualStock <= 200) return '正常';
+/** 按可销售库存计算预警状态 */
+export function calcInventoryStatus(sellableStock: number): InventoryRecord['status'] {
+  if (sellableStock <= 0) return '缺货';
+  if (sellableStock <= 10) return '低库存';
+  if (sellableStock <= 50) return '偏低';
+  if (sellableStock <= 200) return '正常';
   return '充足';
 }
 
@@ -213,7 +213,7 @@ export function registerProductionInbound(
     afterStock = beforeStock + command.quantity;
     newRecords[existIdx].actualStock = afterStock;
     newRecords[existIdx].sellableStock = calculateSellableStock(afterStock, newRecords[existIdx].reservedStock);
-    newRecords[existIdx].status = calcInventoryStatus(afterStock);
+    newRecords[existIdx].status = calcInventoryStatus(newRecords[existIdx].sellableStock);
   } else {
     // 创建新库存记录
     beforeStock = 0;
@@ -300,7 +300,7 @@ export function registerManualInbound(
     afterStock = beforeStock + command.quantity;
     newRecords[existIdx].actualStock = afterStock;
     newRecords[existIdx].sellableStock = calculateSellableStock(afterStock, newRecords[existIdx].reservedStock);
-    newRecords[existIdx].status = calcInventoryStatus(afterStock);
+    newRecords[existIdx].status = calcInventoryStatus(newRecords[existIdx].sellableStock);
   } else {
     beforeStock = 0;
     afterStock = command.quantity;

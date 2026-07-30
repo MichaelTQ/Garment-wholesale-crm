@@ -70,7 +70,7 @@ export default function InventoryPage() {
     { label: '实际库存总量', value: `${totalActual.toLocaleString()}件` },
     { label: '已预留库存', value: `${totalReserved.toLocaleString()}件` },
     { label: '可销售库存', value: `${totalSellable.toLocaleString()}件` },
-    { label: '低库存商品', value: `${lowStockCount}款`, color: 'text-red-600' },
+    { label: '低库存 SKU（可售≤10）', value: `${lowStockCount}个`, color: 'text-red-600' },
   ];
 
   const filteredRecords = warehouseFilter === '全部'
@@ -131,7 +131,7 @@ export default function InventoryPage() {
                     <TableHead className="text-xs text-right">实际库存</TableHead>
                     <TableHead className="text-xs text-right">已预留</TableHead>
                     <TableHead className="text-xs text-right">可销售库存</TableHead>
-                    <TableHead className="text-xs text-center">状态</TableHead>
+                    <TableHead className="text-xs text-center">状态（按可销售库存）</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>

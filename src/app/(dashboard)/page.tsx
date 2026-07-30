@@ -27,7 +27,7 @@ export default function DashboardPage() {
   ];
   const alertCards = [
     { title: '待发货订单', value: `${orders.filter((order) => ['已确认', '部分发货'].includes(order.status)).length}单`, icon: ShoppingCart, color: 'text-orange-600', bg: 'bg-orange-50', border: 'border-orange-200' },
-    { title: '低库存商品', value: `${lowStockItems.length}款`, icon: AlertTriangle, color: 'text-red-600', bg: 'bg-red-50', border: 'border-red-200' },
+    { title: '低库存 SKU', value: `${lowStockItems.length}个`, icon: AlertTriangle, color: 'text-red-600', bg: 'bg-red-50', border: 'border-red-200' },
   ];
 
   return (

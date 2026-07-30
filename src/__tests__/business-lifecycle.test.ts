@@ -326,4 +326,19 @@ describe('完整业务生命周期', () => {
     expect(state.depositApplications).toHaveLength(1);
     expect(state.customerLedgers[customerId][0].businessType).toBe('预存款抵扣');
   });
+
+  it('库存预警按可销售库存而不是实际库存计算', () => {
+    const state = emptyState();
+    state.inventoryRecords[0] = {
+      ...state.inventoryRecords[0],
+      actualStock: 100,
+      reservedStock: 95,
+      sellableStock: 100,
+      status: '正常',
+    };
+    const derived = deriveBusinessState(state);
+    expect(derived.inventoryRecords[0].actualStock).toBe(100);
+    expect(derived.inventoryRecords[0].sellableStock).toBe(5);
+    expect(derived.inventoryRecords[0].status).toBe('低库存');
+  });
 });
