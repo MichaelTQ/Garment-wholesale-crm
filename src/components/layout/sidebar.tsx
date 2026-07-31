@@ -36,7 +36,7 @@ const navItems = [
   { label: '工厂管理', href: '/factories', icon: Factory },
   { label: '财务报表', href: '/finance', icon: BarChart3 },
   { label: '上新通知', href: '/notifications', icon: Bell },
-  { label: '数据导入', href: '/import', icon: Upload },
+  { label: '数据导入', href: '/data-import', icon: Upload },
   { label: '系统设置', href: '/settings', icon: Settings },
 ];
 
