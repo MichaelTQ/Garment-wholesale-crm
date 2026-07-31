@@ -14,7 +14,7 @@ import type {
 } from '@/lib/mock-data';
 
 export const BUSINESS_STORAGE_KEY = 'helen-crm-business-state';
-export const BUSINESS_STORAGE_VERSION = 1;
+export const BUSINESS_STORAGE_VERSION = 2;
 
 export interface InventoryReservation {
   id: string;
