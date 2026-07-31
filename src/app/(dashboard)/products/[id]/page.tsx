@@ -105,7 +105,7 @@ export default function ProductDetailPage() {
                 <tbody>
                   {relatedBatches.map(b => (
                     <tr key={b.id} className="border-b last:border-0">
-                      <td className="text-xs p-3 font-medium">{b.id.toUpperCase()}</td>
+                      <td className="text-xs p-3 font-medium">{b.batchNo}</td>
                       <td className="text-xs p-3">{b.factoryName}</td>
                       <td className="text-xs p-3">{b.color}</td>
                       <td className="text-xs p-3">{b.size}</td>

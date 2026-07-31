@@ -15,6 +15,7 @@ import { formatCurrency, getStatusColor } from '@/lib/mock-data';
 import { toast } from 'sonner';
 import { useBusinessState } from '@/lib/state/provider';
 import { splitFormList } from '@/lib/types/product';
+import { formatCustomerNo } from '@/lib/business-number';
 
 const defaultCountries = ['尼日利亚', '加纳', '肯尼亚', '坦桑尼亚', '南非', '刚果（金）', '安哥拉', '其他'];
 const statusOptions = ['全部', '活跃', '一般', '长期未购买', '有欠款', '有预存款'];
@@ -135,7 +136,7 @@ export default function CustomersPage() {
               <TableBody>
                 {paginatedData.map((c) => (
                   <TableRow key={c.id}>
-                    <TableCell className="text-xs">{c.id.toUpperCase()}</TableCell>
+                    <TableCell className="text-xs font-medium">{formatCustomerNo(c.id)}</TableCell>
                     <TableCell className="text-xs font-medium">
                       <Link href={`/customers/${c.id}`} className="hover:text-[#1e3a5f] hover:underline">
                         {c.name}

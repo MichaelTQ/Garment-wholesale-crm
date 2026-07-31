@@ -4,6 +4,7 @@ import {
   findInventoryIndex,
 } from '@/lib/services/inventory';
 import { createDatabaseId } from '@/lib/database-id';
+import { createDocumentNo } from '@/lib/business-number';
 import type {
   Customer,
   CustomerLedger,
@@ -42,10 +43,7 @@ export function createBusinessId(prefix: string): string {
   return createDatabaseId(prefix);
 }
 
-export function createDocumentNo(prefix: string, date: string, sequence: number): string {
-  const compactDate = date.replaceAll('-', '') || '00000000';
-  return `${prefix}-${compactDate}-${String(sequence + 1).padStart(3, '0')}`;
-}
+export { createDocumentNo };
 
 function cloneState(state: BusinessState): BusinessState {
   return {
@@ -308,9 +306,10 @@ export function createProductionBatchTransaction(
   }
   if (!command.startDate) throw new Error('请选择生产日期');
   const totalCost = command.quantity * command.unitCost;
-  const batchNo = createDocumentNo('PB', command.startDate, state.productionBatches.length);
+  const batchId = createBusinessId('batch');
+  const batchNo = createDocumentNo('PB', command.startDate, batchId);
   const batch = {
-    id: createBusinessId('batch'),
+    id: batchId,
     batchNo,
     factoryId: factory.id,
     factoryName: factory.name,
@@ -362,9 +361,10 @@ export function createFactoryPaymentTransaction(
   if (batch.unpaidAmount === 0 && batch.inboundQuantity >= batch.quantity) {
     batch.status = '已结清';
   }
+  const paymentId = createBusinessId('fpay');
   const payment: FactoryPayment = {
-    id: createBusinessId('fpay'),
-    paymentNo: createDocumentNo('FPAY', command.paymentDate, next.factoryPayments.length),
+    id: paymentId,
+    paymentNo: createDocumentNo('FP', command.paymentDate, paymentId),
     factoryId: factory.id,
     factoryName: factory.name,
     paymentDate: command.paymentDate,
@@ -444,7 +444,7 @@ export function createOrderTransaction(
       totalAmount,
     )
     : 0;
-  const orderNo = createDocumentNo('ORD', command.orderDate, next.orders.length);
+  const orderNo = createDocumentNo('SO', command.orderDate, orderId);
   const items: Order['items'] = command.items.map((item) => ({
     id: createBusinessId('oi'),
     productId: item.productId,
@@ -750,7 +750,7 @@ export function createShipmentTransaction(
   }
 
   const shipmentId = createBusinessId('ship');
-  const shipmentNo = createDocumentNo('SHP', command.shipDate, next.shipments.length);
+  const shipmentNo = createDocumentNo('SH', command.shipDate, shipmentId);
   const shipmentItems: Shipment['items'] = [];
   const warehouseIds = new Set<string>();
   const warehouseNames = new Set<string>();
@@ -858,7 +858,7 @@ export function createPaymentTransaction(
   const customer = next.customers.find((item) => item.id === command.customerId);
   if (!customer) throw new Error('请选择有效客户');
   const paymentId = createBusinessId('pay');
-  const paymentNo = createDocumentNo('PAY', command.paymentDate, next.payments.length);
+  const paymentNo = createDocumentNo('PM', command.paymentDate, paymentId);
   const unpaidOrders = next.orders
     .filter(
       (order) =>
@@ -966,7 +966,7 @@ export function applyDepositTransaction(
     applicationNo: createDocumentNo(
       'DEP',
       command.applicationDate,
-      next.depositApplications.length,
+      applicationId,
     ),
     customerId: customer.id,
     customerName: customer.name,
@@ -1015,7 +1015,11 @@ export function transferStockTransaction(
   }
   const targetWarehouse = next.warehouses.find((item) => item.id === command.toWarehouseId);
   if (!targetWarehouse) throw new Error('调入仓库不存在');
-  const transferNo = createDocumentNo('TRF', command.date, next.inventoryFlows.filter((flow) => flow.type === '仓库调拨').length / 2);
+  const transferNo = createDocumentNo(
+    'TRF',
+    command.date,
+    createBusinessId('trf'),
+  );
   const sourceBefore = source.actualStock;
   source.actualStock -= command.quantity;
   source.sellableStock = calculateSellableStock(source.actualStock, source.reservedStock);

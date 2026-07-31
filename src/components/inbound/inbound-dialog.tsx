@@ -358,7 +358,7 @@ export function InboundDialog({ open, onOpenChange, defaultBatchId }: InboundDia
                   <SelectContent>
                     {inboundableBatches.map((batch) => (
                       <SelectItem key={batch.id} value={batch.id}>
-                        {batch.batchNo ?? batch.id.toUpperCase()} · {batch.styleNo} · {batch.color}/{batch.size} · 剩余 {getRemainingInboundQuantity(batch)} 件
+                        {batch.batchNo} · {batch.styleNo} · {batch.color}/{batch.size} · 剩余 {getRemainingInboundQuantity(batch)} 件
                       </SelectItem>
                     ))}
                   </SelectContent>

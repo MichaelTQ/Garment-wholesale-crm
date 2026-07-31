@@ -16,6 +16,7 @@ import { useBusinessState } from '@/lib/state/provider';
 import { InboundDialog } from '@/components/inbound/inbound-dialog';
 import { canBatchInbound, getRemainingInboundQuantity } from '@/lib/services/inventory';
 import { toast } from 'sonner';
+import { formatFactoryNo } from '@/lib/business-number';
 
 export default function FactoriesPage() {
   const {
@@ -205,7 +206,7 @@ export default function FactoriesPage() {
                 <TableBody>
                   {factories.map(f => (
                     <TableRow key={f.id}>
-                      <TableCell className="text-xs">{f.id.toUpperCase()}</TableCell>
+                      <TableCell className="text-xs font-medium">{formatFactoryNo(f.id)}</TableCell>
                       <TableCell className="text-xs font-medium">{f.name}</TableCell>
                       <TableCell className="text-xs">{f.contact}</TableCell>
                       <TableCell className="text-xs">{f.phone}</TableCell>
@@ -258,7 +259,7 @@ export default function FactoriesPage() {
                     const remaining = getRemainingInboundQuantity(b);
                     return (
                       <TableRow key={b.id}>
-                        <TableCell className="text-xs font-medium">{b.batchNo || b.id.toUpperCase()}</TableCell>
+                        <TableCell className="text-xs font-medium">{b.batchNo}</TableCell>
                         <TableCell className="text-xs">{b.factoryName}</TableCell>
                         <TableCell className="text-xs">{b.styleNo}</TableCell>
                         <TableCell className="text-xs">{b.productName}</TableCell>
@@ -281,7 +282,7 @@ export default function FactoriesPage() {
                               size="sm"
                               className="h-7 text-xs"
                               onClick={() => handleInboundClick(b.id)}
-                              aria-label={`登记入库 ${b.id.toUpperCase()}`}
+                              aria-label={`登记入库 ${b.batchNo}`}
                             >
                               登记入库
                             </Button>

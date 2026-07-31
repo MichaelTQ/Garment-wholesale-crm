@@ -12,6 +12,7 @@ import { useParams, useRouter } from 'next/navigation';
 import { useBusinessState } from '@/lib/state/provider';
 import { InboundDialog } from '@/components/inbound/inbound-dialog';
 import { canBatchInbound, getRemainingInboundQuantity } from '@/lib/services/inventory';
+import { formatFactoryNo } from '@/lib/business-number';
 
 export default function FactoryDetailPage() {
   const params = useParams();
@@ -88,7 +89,7 @@ export default function FactoryDetailPage() {
                 <div className="space-y-3">
                   <h4 className="text-sm font-medium">基本信息</h4>
                   <div className="space-y-2 text-sm">
-                    <div className="flex justify-between"><span className="text-muted-foreground">工厂编号</span><span>{factory.id.toUpperCase()}</span></div>
+                    <div className="flex justify-between"><span className="text-muted-foreground">工厂编号</span><span>{formatFactoryNo(factory.id)}</span></div>
                     <div className="flex justify-between"><span className="text-muted-foreground">工厂名称</span><span className="font-medium">{factory.name}</span></div>
                     <div className="flex justify-between"><span className="text-muted-foreground">联系人</span><span>{factory.contact}</span></div>
                     <div className="flex justify-between"><span className="text-muted-foreground">电话</span><span>{factory.phone}</span></div>
@@ -135,7 +136,7 @@ export default function FactoryDetailPage() {
                     const remaining = getRemainingInboundQuantity(b);
                     return (
                       <TableRow key={b.id}>
-                        <TableCell className="text-xs font-medium">{b.batchNo || b.id.toUpperCase()}</TableCell>
+                        <TableCell className="text-xs font-medium">{b.batchNo}</TableCell>
                         <TableCell className="text-xs">{b.styleNo}</TableCell>
                         <TableCell className="text-xs">{b.productName}</TableCell>
                         <TableCell className="text-xs">{b.color}</TableCell>
@@ -157,7 +158,7 @@ export default function FactoryDetailPage() {
                               size="sm"
                               className="h-7 text-xs"
                               onClick={() => handleInboundClick(b.id)}
-                              aria-label={`登记入库 ${b.id.toUpperCase()}`}
+                              aria-label={`登记入库 ${b.batchNo}`}
                             >
                               登记入库
                             </Button>
@@ -230,7 +231,7 @@ export default function FactoryDetailPage() {
                       <TableRow key={b.id}>
                         <TableCell className="text-xs">{b.inboundDate || '-'}</TableCell>
                         <TableCell className="text-xs">生产入库</TableCell>
-                        <TableCell className="text-xs">{b.batchNo || b.id.toUpperCase()}</TableCell>
+                        <TableCell className="text-xs">{b.batchNo}</TableCell>
                         <TableCell className="text-xs">{b.styleNo} {b.productName} {b.color}/{b.size} x{b.quantity}</TableCell>
                         <TableCell className="text-xs text-right tabular-nums">{formatCurrency(b.totalCost)}</TableCell>
                         <TableCell className="text-xs text-right tabular-nums text-green-600">{b.paidAmount > 0 ? formatCurrency(b.paidAmount) : '-'}</TableCell>

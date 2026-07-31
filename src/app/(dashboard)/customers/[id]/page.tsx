@@ -13,6 +13,7 @@ import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { toast } from 'sonner';
 import { useBusinessState } from '@/lib/state/provider';
+import { formatCustomerNo } from '@/lib/business-number';
 
 export default function CustomerDetailPage() {
   const params = useParams();
@@ -77,7 +78,7 @@ export default function CustomerDetailPage() {
                 <span>国家：{customer.country}</span>
                 <span>城市：{customer.city}</span>
                 <span>WhatsApp：{customer.whatsapp}</span>
-                <span>编号：{customer.id.toUpperCase()}</span>
+                <span>编号：{formatCustomerNo(customer.id)}</span>
               </div>
             </div>
             <div className="flex gap-2">
@@ -133,7 +134,7 @@ export default function CustomerDetailPage() {
                   <h3 className="font-medium text-[#1f2937]">基本资料</h3>
                   <Separator />
                   <div className="grid grid-cols-2 gap-y-3 text-sm">
-                    <span className="text-muted-foreground">客户编号</span><span>{customer.id.toUpperCase()}</span>
+                    <span className="text-muted-foreground">客户编号</span><span>{formatCustomerNo(customer.id)}</span>
                     <span className="text-muted-foreground">客户名称</span><span>{customer.name}</span>
                     <span className="text-muted-foreground">国家</span><span>{customer.country}</span>
                     <span className="text-muted-foreground">城市</span><span>{customer.city}</span>
