@@ -128,6 +128,17 @@ export async function syncFullState(state: BusinessState): Promise<SyncResult> {
         }
         return snakeRow;
       });
+      const seenIds = new Set<string>();
+      for (const row of processedRows) {
+        const id = typeof row.id === 'string' ? row.id : '';
+        if (!id) continue;
+        if (seenIds.has(id)) {
+          throw new Error(
+            `同步 ${table} 失败：同一批次存在重复主键 ${id}`,
+          );
+        }
+        seenIds.add(id);
+      }
       // Upsert in batches of 100 (on conflict 'id', merge)
       for (let i = 0; i < processedRows.length; i += 100) {
         const batch = processedRows.slice(i, i + 100);

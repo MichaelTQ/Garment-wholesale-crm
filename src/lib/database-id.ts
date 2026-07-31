@@ -43,13 +43,28 @@ export function createDatabaseId(prefix: string, now?: number): string {
 /**
  * shipment_items 没有独立的前端实体 ID，使用发货单和订单明细生成稳定主键。
  */
+function hashShipmentItemSource(source: string, seed: number): string {
+  let hash = seed >>> 0;
+  for (let index = 0; index < source.length; index += 1) {
+    hash ^= source.charCodeAt(index);
+    hash = Math.imul(hash, 16_777_619);
+    hash ^= hash >>> 13;
+  }
+  return (hash >>> 0).toString(36).padStart(7, '0');
+}
+
 export function createShipmentItemId(
   shipmentId: string,
   orderItemId: string,
   index: number,
 ): string {
-  const source = `${shipmentId}${orderItemId || index.toString(36)}`
-    .toLowerCase()
-    .replace(/[^a-z0-9]/g, '');
-  return `si${source}`.slice(0, 20);
+  // 旧实现直接截断 `${shipmentId}${orderItemId}`，当订单明细仅末尾不同时
+  // 会产生相同 ID。这里对完整来源做双重 32 位散列，并始终包含数组序号。
+  const source = `${shipmentId}|${orderItemId}|${index}`;
+  const first = hashShipmentItemSource(source, 2_166_136_261);
+  const second = hashShipmentItemSource(
+    source.split('').reverse().join(''),
+    2_654_435_769,
+  );
+  return `si${first}${second}`;
 }

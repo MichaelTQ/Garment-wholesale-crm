@@ -51,4 +51,18 @@ describe('数据库 ID', () => {
     expect(first).toBe(second);
     expect(first.length).toBeLessThanOrEqual(20);
   });
+
+  it('订单明细 ID 仅末尾不同时也不会生成重复发货明细 ID', () => {
+    const first = createShipmentItemId('sh12345678', 'oi12345670', 0);
+    const second = createShipmentItemId('sh12345678', 'oi12345671', 1);
+
+    expect(first).not.toBe(second);
+  });
+
+  it('相同订单明细在不同位置仍生成唯一 ID', () => {
+    const first = createShipmentItemId('sh12345678', 'oi12345670', 0);
+    const second = createShipmentItemId('sh12345678', 'oi12345670', 1);
+
+    expect(first).not.toBe(second);
+  });
 });
