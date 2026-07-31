@@ -2,22 +2,26 @@ import { createClient, SupabaseClient } from '@supabase/supabase-js';
 
 const _clientCache: Map<string, SupabaseClient> = new Map();
 
+/**
+ * 获取 Supabase 连接配置
+ * 优先从标准环境变量读取，兼容多种命名方式
+ */
 function getSupabaseCredentials(): { url: string; anonKey: string } {
-  const url = process.env.COZE_SUPABASE_URL;
-  const anonKey = process.env.COZE_SUPABASE_ANON_KEY;
+  const url = process.env.COZE_SUPABASE_URL || process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const anonKey = process.env.COZE_SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
   if (!url || !anonKey) {
     // 在构建阶段（静态分析）环境变量可能不存在，此时返回空值而非抛错
     // 这样 Next.js 构建不会因为缺少环境变量而失败
     // 实际调用时如果仍然缺少，会在下面 createClient 时自然失败
-    if (!url) return { url: 'https://placeholder.supabase.co', anonKey: anonKey ?? 'placeholder' };
+    return { url: 'https://placeholder.supabase.co', anonKey: 'placeholder' };
   }
 
-  return { url: url as string, anonKey: anonKey as string };
+  return { url, anonKey };
 }
 
 function getSupabaseServiceRoleKey(): string | undefined {
-  return process.env.COZE_SUPABASE_SERVICE_ROLE_KEY;
+  return process.env.COZE_SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY;
 }
 
 /**
@@ -71,7 +75,10 @@ export function getSupabaseServerClient(): SupabaseClient {
 /**
  * 检查 Supabase 是否已配置（环境变量存在）
  * 用于 seed/sync API 判断是否可用
+ * 宽松检查：只要 URL 或 KEY 任一存在即认为可能已配置
  */
 export function isSupabaseConfigured(): boolean {
-  return !!process.env.COZE_SUPABASE_URL && !!process.env.COZE_SUPABASE_ANON_KEY;
+  const url = process.env.COZE_SUPABASE_URL || process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const anonKey = process.env.COZE_SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+  return !!url && !!anonKey;
 }

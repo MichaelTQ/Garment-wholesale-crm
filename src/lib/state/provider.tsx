@@ -420,9 +420,13 @@ export function BusinessProvider({ children }: { children: ReactNode }) {
       } else if (dbState) {
         markLocalSyncPending(false);
         setSyncStatus('synced');
+      } else if (localState) {
+        // 本地有数据但数据库连不上，不报错，静默使用本地数据
+        setSyncStatus('error');
+        setSyncError(null);
       } else {
         setSyncStatus('error');
-        setSyncError('数据库连接失败，当前显示本机缓存数据');
+        setSyncError('数据库连接失败，当前显示初始数据');
       }
     }
 
