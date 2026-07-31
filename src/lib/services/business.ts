@@ -112,7 +112,12 @@ function deriveOrder(order: Order): Order {
   };
 }
 
-function deriveCustomer(customer: Customer, orders: Order[], payments: Payment[]): Customer {
+function deriveCustomer(
+  customer: Customer,
+  orders: Order[],
+  payments: Payment[],
+  ledgerEntries: CustomerLedger[],
+): Customer {
   const activeOrders = orders.filter(
     (order) =>
       order.customerId === customer.id &&
@@ -120,11 +125,20 @@ function deriveCustomer(customer: Customer, orders: Order[], payments: Payment[]
   );
   const customerPayments = payments.filter((payment) => payment.customerId === customer.id);
   const totalSales = activeOrders.reduce((sum, order) => sum + order.totalAmount, 0);
-  const orderReceivable = activeOrders.reduce((sum, order) => sum + order.unpaidAmount, 0);
+  const openingReceivable = ledgerEntries
+    .filter((entry) => entry.businessType === '期初余额')
+    .reduce(
+      (sum, entry) =>
+        sum + Math.max(0, entry.increaseReceivable - entry.receivedAmount),
+      0,
+    );
+  const orderReceivable =
+    activeOrders.reduce((sum, order) => sum + order.unpaidAmount, 0) +
+    openingReceivable;
   const shippedDebt = activeOrders.reduce(
     (sum, order) => sum + Math.max(0, shipmentValueForOrder(order) - order.paidAmount),
     0,
-  );
+  ) + openingReceivable;
   const pendingShipQty = activeOrders.reduce(
     (sum, order) => sum + order.pendingShipQuantity,
     0,
@@ -177,7 +191,12 @@ export function deriveBusinessState(state: BusinessState): BusinessState {
     return { ...product, currentStock, lastCost: latestBatch?.unitCost ?? product.lastCost };
   });
   const customers = state.customers.map((customer) =>
-    deriveCustomer(customer, orders, state.payments),
+    deriveCustomer(
+      customer,
+      orders,
+      state.payments,
+      state.customerLedgers[customer.id] ?? [],
+    ),
   );
   const factories = state.factories.map((factory) => {
     const batches = state.productionBatches.filter((batch) => batch.factoryId === factory.id);

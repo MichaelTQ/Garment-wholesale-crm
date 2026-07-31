@@ -252,6 +252,7 @@ interface BusinessContextValue extends BusinessState {
   createPayment: (command: CreatePaymentCommand) => BusinessOperationResult;
   applyDeposit: (command: ApplyDepositCommand) => BusinessOperationResult;
   transferStock: (command: TransferStockCommand) => BusinessOperationResult;
+  importBusinessState: (nextState: BusinessState) => BusinessOperationResult;
   resetBusinessData: () => void;
 }
 
@@ -745,6 +746,21 @@ export function BusinessProvider({ children }: { children: ReactNode }) {
     replaceState(createEmptyBusinessState(stateRef.current.warehouses));
   }, [replaceState]);
 
+  const importBusinessState = useCallback(
+    (nextState: BusinessState): BusinessOperationResult => {
+      try {
+        replaceState(nextState);
+        return { ok: true };
+      } catch (error: unknown) {
+        return {
+          ok: false,
+          error: error instanceof Error ? error.message : '导入业务数据失败',
+        };
+      }
+    },
+    [replaceState],
+  );
+
   const value = useMemo<BusinessContextValue>(
     () => ({
       ...state,
@@ -772,6 +788,7 @@ export function BusinessProvider({ children }: { children: ReactNode }) {
       createPayment,
       applyDeposit,
       transferStock,
+      importBusinessState,
       resetBusinessData,
     }),
     [
@@ -800,6 +817,7 @@ export function BusinessProvider({ children }: { children: ReactNode }) {
       createPayment,
       applyDeposit,
       transferStock,
+      importBusinessState,
       resetBusinessData,
     ],
   );

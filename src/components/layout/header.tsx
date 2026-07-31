@@ -26,7 +26,7 @@ const pageTitles: Record<string, string> = {
   '/factories': '工厂管理',
   '/finance': '财务报表',
   '/notifications': '上新通知',
-  '/import': '数据导入',
+  '/data-import': '数据导入',
   '/settings': '系统设置',
   '/receivables': '客户应收汇总',
   '/factory-payments': '工厂付款',
