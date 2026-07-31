@@ -1,14 +1,15 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextResponse } from 'next/server';
 import {
   getSupabaseClient,
   getSupabaseConfiguration,
 } from '@/storage/database/supabase-client';
+import { withCurrentStorageVersion } from '@/lib/state/storage-version';
 
 /**
  * POST /api/db/load
  * 从 Supabase 加载全量业务数据并返回 BusinessState JSON
  */
-export async function POST(request: NextRequest) {
+export async function POST() {
   const configuration = getSupabaseConfiguration();
   if (!configuration.configured) {
     return NextResponse.json(
@@ -322,8 +323,7 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    const state = {
-      storageVersion: 1,
+    const state = withCurrentStorageVersion({
       warehouses,
       customers,
       products,
@@ -339,7 +339,7 @@ export async function POST(request: NextRequest) {
       paymentAllocations: [],
       depositApplications: [],
       customerLedgers,
-    };
+    });
 
     return NextResponse.json(
       { ok: true, data: state },

@@ -6,11 +6,14 @@ import {
   deleteOrdersTransaction,
   deleteProductsTransaction,
 } from '@/lib/services/deletion';
-import type { BusinessState } from '@/lib/types/business';
+import {
+  BUSINESS_STORAGE_VERSION,
+  type BusinessState,
+} from '@/lib/types/business';
 
 function stateFixture(): BusinessState {
   return {
-    storageVersion: 1,
+    storageVersion: BUSINESS_STORAGE_VERSION,
     customers: [
       {
         id: 'cus0000001',

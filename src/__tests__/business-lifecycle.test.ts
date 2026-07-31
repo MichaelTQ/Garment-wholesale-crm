@@ -10,11 +10,14 @@ import {
   createShipmentTransaction,
   deriveBusinessState,
 } from '@/lib/services/business';
-import type { BusinessState } from '@/lib/types/business';
+import {
+  BUSINESS_STORAGE_VERSION,
+  type BusinessState,
+} from '@/lib/types/business';
 
 function emptyState(): BusinessState {
   return {
-    storageVersion: 1,
+    storageVersion: BUSINESS_STORAGE_VERSION,
     customers: [],
     products: [
       {
