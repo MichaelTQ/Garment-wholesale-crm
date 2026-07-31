@@ -37,7 +37,17 @@ COZE_SUPABASE_SERVICE_ROLE_KEY=your-service-role-key
 ```
 
 `COZE_SUPABASE_SERVICE_ROLE_KEY` 不得使用 `NEXT_PUBLIC_` 前缀或暴露到浏览器。
-登录系统后可通过顶部状态查看数据库是否“已同步”；“同步失败”时可点击重试并查看错误提示。
+在 Coze 部署环境中，系统会在普通环境变量缺失时通过 workload identity
+自动读取项目数据库配置；其他部署平台也兼容 `SUPABASE_URL`、
+`SUPABASE_ANON_KEY` 和 `SUPABASE_SERVICE_ROLE_KEY`。
+
+登录系统后可通过顶部状态查看数据库状态：
+
+- “已同步”：云端读写正常。
+- “仅本地”：云数据库尚未配置，数据当前只保存在本机。
+- “同步失败”：数据库已配置但查询或写入失败。
+
+点击“仅本地”或“同步失败”可查看具体原因并重试。
 
 ### 业务编号规范
 

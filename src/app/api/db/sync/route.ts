@@ -1,5 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getSupabaseClient, isSupabaseConfigured } from '@/storage/database/supabase-client';
+import {
+  getSupabaseClient,
+  getSupabaseConfiguration,
+} from '@/storage/database/supabase-client';
 import type { BusinessState } from '@/lib/types/business';
 import {
   createShipmentItemId,
@@ -12,6 +15,7 @@ import {
  */
 export interface SyncResult {
   ok: boolean;
+  code?: string;
   error?: string;
 }
 
@@ -90,8 +94,13 @@ function assertDatabaseCompatibleIds(state: BusinessState): void {
 }
 
 export async function syncFullState(state: BusinessState): Promise<SyncResult> {
-  if (!isSupabaseConfigured()) {
-    return { ok: false, error: 'Supabase 未配置' };
+  const configuration = getSupabaseConfiguration();
+  if (!configuration.configured) {
+    return {
+      ok: false,
+      code: 'DATABASE_NOT_CONFIGURED',
+      error: `云数据库未配置，缺少 ${configuration.missing.join('、')}`,
+    };
   }
   const client = getSupabaseClient();
   try {
@@ -425,7 +434,7 @@ export async function syncFullState(state: BusinessState): Promise<SyncResult> {
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : '同步失败';
     console.error('sync error:', message);
-    return { ok: false, error: message };
+    return { ok: false, code: 'DATABASE_SYNC_FAILED', error: message };
   }
 }
 
@@ -435,9 +444,18 @@ export async function POST(request: NextRequest) {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const state = (body.state || body) as BusinessState;
     const result = await syncFullState(state);
-    return NextResponse.json(result, { status: result.ok ? 200 : 500 });
+    return NextResponse.json(result, {
+      status: result.ok
+        ? 200
+        : result.code === 'DATABASE_NOT_CONFIGURED'
+          ? 503
+          : 500,
+    });
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : 'Internal error';
-    return NextResponse.json({ error: message }, { status: 500 });
+    return NextResponse.json(
+      { ok: false, code: 'INVALID_SYNC_REQUEST', error: message },
+      { status: 500 },
+    );
   }
 }

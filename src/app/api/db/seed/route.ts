@@ -1,12 +1,23 @@
 import { NextResponse } from 'next/server';
 import { generateFullBusinessState } from '@/lib/db/generate-mock-data';
 import { syncFullState } from '@/app/api/db/sync/route';
-import { isSupabaseConfigured, getSupabaseClient } from '@/storage/database/supabase-client';
+import {
+  getSupabaseClient,
+  getSupabaseConfiguration,
+} from '@/storage/database/supabase-client';
 
 export async function POST() {
   try {
-    if (!isSupabaseConfigured()) {
-      return NextResponse.json({ ok: false, error: 'Supabase 未配置' }, { status: 500 });
+    const configuration = getSupabaseConfiguration();
+    if (!configuration.configured) {
+      return NextResponse.json(
+        {
+          ok: false,
+          code: 'DATABASE_NOT_CONFIGURED',
+          error: `云数据库未配置，缺少 ${configuration.missing.join('、')}`,
+        },
+        { status: 503 },
+      );
     }
     const client = getSupabaseClient();
     const { count } = await client

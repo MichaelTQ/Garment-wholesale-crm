@@ -1,13 +1,24 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getSupabaseClient, isSupabaseConfigured } from '@/storage/database/supabase-client';
+import {
+  getSupabaseClient,
+  getSupabaseConfiguration,
+} from '@/storage/database/supabase-client';
 
 /**
  * POST /api/db/load
  * 从 Supabase 加载全量业务数据并返回 BusinessState JSON
  */
 export async function POST(request: NextRequest) {
-  if (!isSupabaseConfigured()) {
-    return NextResponse.json({ ok: false, error: 'Supabase 未配置' }, { status: 503 });
+  const configuration = getSupabaseConfiguration();
+  if (!configuration.configured) {
+    return NextResponse.json(
+      {
+        ok: false,
+        code: 'DATABASE_NOT_CONFIGURED',
+        error: `云数据库未配置，缺少 ${configuration.missing.join('、')}`,
+      },
+      { status: 503 },
+    );
   }
   const client = getSupabaseClient();
   try {
@@ -53,7 +64,11 @@ export async function POST(request: NextRequest) {
     ].filter(r => r.error);
     if (errors.length > 0) {
       return NextResponse.json(
-        { error: errors.map(e => e.error!.message).join('; ') },
+        {
+          ok: false,
+          code: 'DATABASE_QUERY_FAILED',
+          error: errors.map(e => e.error!.message).join('; '),
+        },
         { status: 500 },
       );
     }
@@ -332,6 +347,9 @@ export async function POST(request: NextRequest) {
     );
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : '加载数据失败';
-    return NextResponse.json({ error: message }, { status: 500 });
+    return NextResponse.json(
+      { ok: false, code: 'DATABASE_LOAD_FAILED', error: message },
+      { status: 500 },
+    );
   }
 }

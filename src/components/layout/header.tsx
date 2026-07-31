@@ -13,6 +13,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import { toast } from 'sonner';
 
 const pageTitles: Record<string, string> = {
   '/': '首页仪表盘',
@@ -41,9 +42,19 @@ export function AppHeader() {
       ? '已同步'
       : syncStatus === 'error'
         ? '同步失败'
+        : syncStatus === 'local-only'
+          ? '仅本地'
         : syncStatus === 'loading'
           ? '连接数据库'
           : '同步中';
+  const canRetry =
+    syncStatus === 'error' || syncStatus === 'local-only';
+
+  const handleSyncClick = () => {
+    if (!canRetry) return;
+    if (syncError) toast.error(syncError);
+    retrySync();
+  };
 
   return (
     <header className="sticky top-0 z-30 flex h-14 items-center gap-4 border-b bg-white px-4 lg:px-6">
@@ -54,14 +65,22 @@ export function AppHeader() {
           type="button"
           variant="ghost"
           size="sm"
-          className={syncStatus === 'error' ? 'text-red-600 hover:text-red-700' : 'text-muted-foreground'}
-          onClick={syncStatus === 'error' ? retrySync : undefined}
+          className={
+            syncStatus === 'error'
+              ? 'text-red-600 hover:text-red-700'
+              : syncStatus === 'local-only'
+                ? 'text-amber-600 hover:text-amber-700'
+                : 'text-muted-foreground'
+          }
+          onClick={canRetry ? handleSyncClick : undefined}
           disabled={syncStatus === 'loading' || syncStatus === 'syncing'}
           title={syncError ?? syncLabel}
-          aria-label={syncStatus === 'error' ? `${syncLabel}，点击重试` : syncLabel}
+          aria-label={canRetry ? `${syncLabel}，点击查看原因并重试` : syncLabel}
         >
           {syncStatus === 'synced' && <Cloud className="h-4 w-4" />}
-          {syncStatus === 'error' && <CloudOff className="h-4 w-4" />}
+          {(syncStatus === 'error' || syncStatus === 'local-only') && (
+            <CloudOff className="h-4 w-4" />
+          )}
           {(syncStatus === 'loading' || syncStatus === 'syncing') && (
             <LoaderCircle className="h-4 w-4 animate-spin" />
           )}

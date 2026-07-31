@@ -77,7 +77,12 @@ import type {
 
 const BUSINESS_SYNC_PENDING_KEY = `${BUSINESS_STORAGE_KEY}:sync-pending`;
 
-export type BusinessSyncStatus = 'loading' | 'syncing' | 'synced' | 'error';
+export type BusinessSyncStatus =
+  | 'loading'
+  | 'syncing'
+  | 'synced'
+  | 'local-only'
+  | 'error';
 
 type BusinessAction = { type: 'REPLACE_STATE'; state: BusinessState };
 
@@ -172,54 +177,106 @@ function normalizeStoredState(value: unknown): BusinessState | null {
   });
 }
 
+interface DatabaseLoadResult {
+  state: BusinessState | null;
+  error: string | null;
+  notConfigured: boolean;
+}
+
+interface DatabaseSyncResult {
+  error: string | null;
+  notConfigured: boolean;
+}
+
+interface DatabaseApiResponse {
+  ok?: boolean;
+  code?: string;
+  error?: string;
+  data?: unknown;
+}
+
+async function readDatabaseResponse(
+  response: Response,
+): Promise<DatabaseApiResponse | null> {
+  try {
+    return (await response.json()) as DatabaseApiResponse;
+  } catch {
+    return null;
+  }
+}
+
 /** 从 Supabase 加载全量业务数据 */
-async function loadFromSupabase(): Promise<BusinessState | null> {
+async function loadFromSupabase(): Promise<DatabaseLoadResult> {
   try {
     const res = await fetch('/api/db/load', {
       method: 'POST',
       cache: 'no-store',
     });
+    const json = await readDatabaseResponse(res);
     if (!res.ok) {
-      console.warn('从数据库加载失败，HTTP', res.status);
-      return null;
+      return {
+        state: null,
+        error:
+          json?.error ?? `连接云数据库失败（HTTP ${res.status}）`,
+        notConfigured: json?.code === 'DATABASE_NOT_CONFIGURED',
+      };
     }
-    const json = await res.json();
-    if (!json.ok || !json.data) {
-      console.warn('从数据库加载失败:', json.error);
-      return null;
+    if (!json?.ok || !json.data) {
+      return {
+        state: null,
+        error: json?.error ?? '数据库没有返回有效数据',
+        notConfigured: false,
+      };
     }
     // Normalize the data from DB
     const normalized = normalizeStoredState(json.data);
     if (!normalized) {
-      console.warn('数据库数据格式不兼容');
-      return null;
+      return {
+        state: null,
+        error: '数据库数据格式与当前版本不兼容',
+        notConfigured: false,
+      };
     }
-    return normalized;
+    return { state: normalized, error: null, notConfigured: false };
   } catch (err) {
-    console.warn('从数据库加载异常:', err);
-    return null;
+    return {
+      state: null,
+      error: `连接云数据库异常：${err instanceof Error ? err.message : String(err)}`,
+      notConfigured: false,
+    };
   }
 }
 
 /** 全量同步到 Supabase（防抖后调用），返回错误信息 */
-async function syncToSupabase(state: BusinessState): Promise<string | null> {
+async function syncToSupabase(
+  state: BusinessState,
+): Promise<DatabaseSyncResult> {
   try {
     const res = await fetch('/api/db/sync', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ state }),
     });
+    const json = await readDatabaseResponse(res);
     if (!res.ok) {
-      const text = await res.text().catch(() => '');
-      return `同步到数据库失败 HTTP ${res.status}: ${text.slice(0, 200)}`;
+      return {
+        error:
+          json?.error ?? `同步到云数据库失败（HTTP ${res.status}）`,
+        notConfigured: json?.code === 'DATABASE_NOT_CONFIGURED',
+      };
     }
-    const json = await res.json().catch(() => null);
-    if (json && !json.ok) {
-      return `同步失败: ${json.error ?? '未知错误'}`;
+    if (!json?.ok) {
+      return {
+        error: json?.error ?? '数据库返回未知同步错误',
+        notConfigured: json?.code === 'DATABASE_NOT_CONFIGURED',
+      };
     }
-    return null;
+    return { error: null, notConfigured: false };
   } catch (err) {
-    return `同步到数据库异常: ${err instanceof Error ? err.message : String(err)}`;
+    return {
+      error: `同步到云数据库异常：${err instanceof Error ? err.message : String(err)}`,
+      notConfigured: false,
+    };
   }
 }
 
@@ -287,13 +344,16 @@ export function BusinessProvider({ children }: { children: ReactNode }) {
         setSyncStatus('syncing');
         setSyncError(null);
 
-        const error = await syncToSupabase(snapshot);
-        if (error) {
+        const syncResult = await syncToSupabase(snapshot);
+        if (syncResult.error) {
           // 保留失败快照供用户重试；期间产生的新状态优先。
           pendingSyncRef.current ??= snapshot;
-          setSyncStatus('error');
-          setSyncError(error);
-          console.error('[BusinessProvider] 数据库同步失败:', error);
+          setSyncStatus(syncResult.notConfigured ? 'local-only' : 'error');
+          setSyncError(syncResult.error);
+          console.error(
+            '[BusinessProvider] 数据库同步失败:',
+            syncResult.error,
+          );
           return;
         }
       }
@@ -392,7 +452,8 @@ export function BusinessProvider({ children }: { children: ReactNode }) {
       }
 
       // 2. 再从 Supabase 加载（权威数据源）
-      const dbState = await loadFromSupabase();
+      const loadResult = await loadFromSupabase();
+      const dbState = loadResult.state;
       if (cancelled) return;
 
       // 本地存在尚未上传的变更时，禁止旧数据库快照覆盖本地状态。
@@ -421,12 +482,13 @@ export function BusinessProvider({ children }: { children: ReactNode }) {
         markLocalSyncPending(false);
         setSyncStatus('synced');
       } else if (localState) {
-        // 本地有数据但数据库连不上，不报错，静默使用本地数据
-        setSyncStatus('error');
-        setSyncError(null);
+        setSyncStatus(loadResult.notConfigured ? 'local-only' : 'error');
+        setSyncError(loadResult.error);
       } else {
-        setSyncStatus('error');
-        setSyncError('数据库连接失败，当前显示初始数据');
+        setSyncStatus(loadResult.notConfigured ? 'local-only' : 'error');
+        setSyncError(
+          loadResult.error ?? '数据库连接失败，当前显示初始数据',
+        );
       }
     }
 
@@ -451,8 +513,10 @@ export function BusinessProvider({ children }: { children: ReactNode }) {
       }
       pullingRef.current = true;
       try {
-        const remoteState = await loadFromSupabase();
-        if (!cancelled && remoteState) applyRemoteState(remoteState);
+        const remoteResult = await loadFromSupabase();
+        if (!cancelled && remoteResult.state) {
+          applyRemoteState(remoteResult.state);
+        }
       } finally {
         pullingRef.current = false;
       }
