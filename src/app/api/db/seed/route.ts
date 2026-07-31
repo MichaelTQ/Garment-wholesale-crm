@@ -23,7 +23,7 @@ export async function POST() {
     // Sync to database
     const result = await syncFullState(state);
 
-    if (!result.success) {
+    if (!result.ok) {
       return NextResponse.json({ ok: false, error: result.error }, { status: 500 });
     }
 

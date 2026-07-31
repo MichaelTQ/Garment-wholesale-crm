@@ -7,7 +7,7 @@ import type { BusinessState } from '@/lib/types/business';
  * 策略：先清空所有表，再批量插入
  */
 export interface SyncResult {
-  success: boolean;
+  ok: boolean;
   error?: string;
 }
 
@@ -23,7 +23,7 @@ function toSnakeCase(obj: any): Record<string, unknown> {
 
 export async function syncFullState(state: BusinessState): Promise<SyncResult> {
   if (!isSupabaseConfigured()) {
-    return { success: false, error: 'Supabase 未配置' };
+    return { ok: false, error: 'Supabase 未配置' };
   }
   const client = getSupabaseClient();
   try {
@@ -269,11 +269,11 @@ export async function syncFullState(state: BusinessState): Promise<SyncResult> {
     }
     await syncTable('customer_ledgers', ledgerRows);
 
-    return { success: true };
+    return { ok: true };
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : '同步失败';
     console.error('sync error:', message);
-    return { success: false, error: message };
+    return { ok: false, error: message };
   }
 }
 
@@ -283,7 +283,7 @@ export async function POST(request: NextRequest) {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const state = (body.state || body) as BusinessState;
     const result = await syncFullState(state);
-    return NextResponse.json(result, { status: result.success ? 200 : 500 });
+    return NextResponse.json(result, { status: result.ok ? 200 : 500 });
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : 'Internal error';
     return NextResponse.json({ error: message }, { status: 500 });

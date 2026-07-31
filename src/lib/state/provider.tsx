@@ -190,8 +190,8 @@ async function loadFromSupabase(): Promise<BusinessState | null> {
   }
 }
 
-/** 全量同步到 Supabase（防抖后调用） */
-async function syncToSupabase(state: BusinessState): Promise<void> {
+/** 全量同步到 Supabase（防抖后调用），返回错误信息 */
+async function syncToSupabase(state: BusinessState): Promise<string | null> {
   try {
     const res = await fetch('/api/db/sync', {
       method: 'POST',
@@ -199,10 +199,16 @@ async function syncToSupabase(state: BusinessState): Promise<void> {
       body: JSON.stringify({ state }),
     });
     if (!res.ok) {
-      console.warn('同步到数据库失败，HTTP', res.status);
+      const text = await res.text().catch(() => '');
+      return `同步到数据库失败 HTTP ${res.status}: ${text.slice(0, 200)}`;
     }
+    const json = await res.json().catch(() => null);
+    if (json && !json.ok) {
+      return `同步失败: ${json.error ?? '未知错误'}`;
+    }
+    return null;
   } catch (err) {
-    console.warn('同步到数据库异常:', err);
+    return `同步到数据库异常: ${err instanceof Error ? err.message : String(err)}`;
   }
 }
 
@@ -250,8 +256,11 @@ export function BusinessProvider({ children }: { children: ReactNode }) {
     }
     // Supabase 防抖写入（1秒）
     if (syncTimerRef.current) clearTimeout(syncTimerRef.current);
-    syncTimerRef.current = setTimeout(() => {
-      syncToSupabase(s);
+    syncTimerRef.current = setTimeout(async () => {
+      const error = await syncToSupabase(s);
+      if (error) {
+        console.error('[BusinessProvider] 数据库同步失败:', error);
+      }
     }, 1000);
   }, []);
 
@@ -288,6 +297,9 @@ export function BusinessProvider({ children }: { children: ReactNode }) {
         } catch {
           // ignore
         }
+      } else if (!localState) {
+        // Supabase 加载失败且 localStorage 也没有数据，使用初始 mock 数据
+        // 不做任何操作，state 已经是初始值
       }
 
       setHydrated(true);
