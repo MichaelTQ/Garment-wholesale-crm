@@ -12,18 +12,7 @@ import React, {
   type ReactNode,
 } from 'react';
 import {
-  customers as initialCustomers,
-  factories as initialFactories,
-  factoryPayments as initialFactoryPayments,
-  inventoryFlows as initialInventoryFlows,
-  inventoryRecords as initialInventoryRecords,
-  orders as initialOrders,
-  payments as initialPayments,
-  productionBatches as initialProductionBatches,
-  products as initialProducts,
-  shipments as initialShipments,
   warehouses as initialWarehouses,
-  customerLedgers as initialCustomerLedgers,
 } from '@/lib/mock-data';
 import type { Product } from '@/lib/mock-data';
 import {
@@ -69,6 +58,7 @@ import {
   BUSINESS_STORAGE_KEY,
   BUSINESS_STORAGE_VERSION,
 } from '@/lib/types/business';
+import { createEmptyBusinessState } from '@/lib/state/empty-state';
 import type {
   ManualInboundCommand,
   NewProductInboundCommand,
@@ -87,50 +77,7 @@ export type BusinessSyncStatus =
 type BusinessAction = { type: 'REPLACE_STATE'; state: BusinessState };
 
 function createInitialState(): BusinessState {
-  return deriveBusinessState({
-    storageVersion: BUSINESS_STORAGE_VERSION,
-    customers: initialCustomers.map((item) => ({
-      ...item,
-      categories: [...item.categories],
-      frequentCategories: [...item.frequentCategories],
-      commonSizes: [...item.commonSizes],
-    })),
-    products: initialProducts.map((item) => ({
-      ...item,
-      colors: item.colors.map((color) => ({ ...color })),
-      sizes: [...item.sizes],
-      images: [...item.images],
-    })),
-    warehouses: initialWarehouses.map((item) => ({ ...item })),
-    factories: initialFactories.map((item) => ({ ...item })),
-    productionBatches: initialProductionBatches.map((item) => ({
-      ...item,
-      inboundQuantity:
-        item.inboundQuantity ??
-        (item.status === '已入库' || item.status === '已结清' ? item.quantity : 0),
-    })),
-    factoryPayments: initialFactoryPayments.map((item) => ({ ...item })),
-    inventoryRecords: initialInventoryRecords.map((item) => ({ ...item })),
-    inventoryFlows: initialInventoryFlows.map((item) => ({ ...item })),
-    inventoryReservations: [],
-    orders: initialOrders.map((order) => ({
-      ...order,
-      items: order.items.map((item) => ({ ...item })),
-    })),
-    shipments: initialShipments.map((shipment) => ({
-      ...shipment,
-      items: shipment.items.map((item) => ({ ...item })),
-    })),
-    payments: initialPayments.map((item) => ({ ...item })),
-    paymentAllocations: [],
-    depositApplications: [],
-    customerLedgers: Object.fromEntries(
-      Object.entries(initialCustomerLedgers).map(([customerId, entries]) => [
-        customerId,
-        entries.map((entry) => ({ ...entry })),
-      ]),
-    ),
-  });
+  return deriveBusinessState(createEmptyBusinessState(initialWarehouses));
 }
 
 function businessReducer(state: BusinessState, action: BusinessAction): BusinessState {
@@ -795,7 +742,7 @@ export function BusinessProvider({ children }: { children: ReactNode }) {
   );
 
   const resetBusinessData = useCallback(() => {
-    replaceState(createInitialState());
+    replaceState(createEmptyBusinessState(stateRef.current.warehouses));
   }, [replaceState]);
 
   const value = useMemo<BusinessContextValue>(

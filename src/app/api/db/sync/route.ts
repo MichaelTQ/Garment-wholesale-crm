@@ -93,7 +93,7 @@ function assertDatabaseCompatibleIds(state: BusinessState): void {
   }
 }
 
-export async function syncFullState(state: BusinessState): Promise<SyncResult> {
+async function syncFullState(state: BusinessState): Promise<SyncResult> {
   const configuration = getSupabaseConfiguration();
   if (!configuration.configured) {
     return {

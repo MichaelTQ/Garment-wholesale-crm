@@ -1,6 +1,5 @@
 import { NextResponse } from 'next/server';
-import { generateFullBusinessState } from '@/lib/db/generate-mock-data';
-import { syncFullState } from '@/app/api/db/sync/route';
+import { warehouses } from '@/lib/mock-data';
 import {
   getSupabaseClient,
   getSupabaseConfiguration,
@@ -20,38 +19,29 @@ export async function POST() {
       );
     }
     const client = getSupabaseClient();
-    const { count } = await client
-      .from('warehouses')
-      .select('*', { count: 'exact', head: true });
-
-    if (count && count > 0) {
-      return NextResponse.json({ ok: true, message: '数据库已有数据，跳过初始化' });
-    }
-
-    // Generate mock data
-    const state = generateFullBusinessState();
-
-    // Sync to database
-    const result = await syncFullState(state);
-
-    if (!result.ok) {
-      return NextResponse.json({ ok: false, error: result.error }, { status: 500 });
+    const { error } = await client.from('warehouses').upsert(
+      warehouses.map((warehouse) => ({
+        id: warehouse.id,
+        name: warehouse.name,
+        address: warehouse.address,
+      })),
+      { onConflict: 'id', ignoreDuplicates: true },
+    );
+    if (error) {
+      return NextResponse.json(
+        {
+          ok: false,
+          code: 'WAREHOUSE_INITIALIZATION_FAILED',
+          error: `初始化仓库失败：${error.message}`,
+        },
+        { status: 500 },
+      );
     }
 
     return NextResponse.json({
       ok: true,
-      message: '模拟数据已成功初始化到数据库',
-      stats: {
-        warehouses: state.warehouses.length,
-        customers: state.customers.length,
-        products: state.products.length,
-        factories: state.factories.length,
-        productionBatches: state.productionBatches.length,
-        orders: state.orders.length,
-        shipments: state.shipments.length,
-        payments: state.payments.length,
-        inventoryRecords: state.inventoryRecords.length,
-      }
+      message: '仓库基础配置已初始化，未生成任何商业数据',
+      stats: { warehouses: warehouses.length },
     });
   } catch (error) {
     const msg = error instanceof Error ? error.message : String(error);
