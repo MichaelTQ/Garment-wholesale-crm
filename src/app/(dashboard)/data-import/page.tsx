@@ -145,12 +145,16 @@ export default function DataImportPage() {
     setShowValidation(false);
     setImportComplete(false);
     try {
-      const nextParsed = await parseImportFile(file);
+      const nextParsed = await parseImportFile(file, selectedType ?? undefined);
       if (!selectedType) throw new Error('请先选择导入类型');
       setUploadedFile(file);
       setParsed(nextParsed);
       setMapping(createAutomaticMapping(selectedType, nextParsed.headers));
-      toast.success(`已读取 ${nextParsed.rows.length} 行数据`);
+      toast.success(
+        nextParsed.detectedFormat === 'whatsapp-contacts'
+          ? `已识别 WhatsApp 联系人格式，可导入 ${nextParsed.rows.length} 行`
+          : `已读取 ${nextParsed.rows.length} 行数据`,
+      );
     } catch (error: unknown) {
       resetFileSteps();
       toast.error(error instanceof Error ? error.message : '文件读取失败');
@@ -311,6 +315,17 @@ export default function DataImportPage() {
                         </div>
                       )}
                     </div>
+                    {parsed?.detectedFormat === 'whatsapp-contacts' && (
+                      <Alert className="mt-4 border-blue-200 bg-blue-50">
+                        <CheckCircle2 className="h-4 w-4 text-blue-600" />
+                        <AlertTitle>已识别 WhatsApp 联系人列表</AlertTitle>
+                        <AlertDescription>
+                          已从第 {parsed.sourceHeaderRow} 行识别真实表头，只读取第一个工作表；
+                          客户名称按“备注名 → 公开名/姓名”转换，并忽略拉黑或没有核心资料的
+                          {parsed.ignoredRows ?? 0} 行。
+                        </AlertDescription>
+                      </Alert>
+                    )}
                   </CardContent>
                 </Card>
               )}

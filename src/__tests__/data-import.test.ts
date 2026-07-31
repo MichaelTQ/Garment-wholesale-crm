@@ -8,6 +8,7 @@ import {
   type MappedImportRow,
 } from '@/lib/data-import';
 import { warehouses } from '@/lib/mock-data';
+import { convertWhatsAppContacts } from '@/lib/data-import-file';
 import { createEmptyBusinessState } from '@/lib/state/empty-state';
 import type { BusinessState } from '@/lib/types/business';
 
@@ -57,6 +58,41 @@ function createMasterDataState(): BusinessState {
 }
 
 describe('data import', () => {
+  it('converts the first-sheet WhatsApp export into customer import rows', () => {
+    const converted = convertWhatsAppContacts('WhatsApp Contacts', [
+      ['Whatsapp联系人列表'],
+      ['Whatsapp联系人列表'],
+      [
+        'country_code',
+        'country_name',
+        'phone_number',
+        'formatted_phone',
+        'is_my_contact',
+        '备注名',
+        '公开名',
+        '是否business账号',
+        '是否被拉黑',
+        'labels',
+      ],
+      ['234', 'Nigeria', '2348000000001', '+234 800 000 0001', '1', '备注客户', '公开客户', '1', '0', 'VIP'],
+      ['228', 'Togo', '22890000001', '+228 90 00 00 01', '1', '', '公开客户二', '0', 'false', ''],
+      ['233', 'Ghana', '23320000001', '+233 20 000 0001', '1', '拉黑客户', 'Blocked', '0', '1', ''],
+      ['', '', '', '', '', '', '', '', '0', ''],
+    ]);
+
+    expect(converted).not.toBeNull();
+    expect(converted).toMatchObject({
+      detectedFormat: 'whatsapp-contacts',
+      sourceHeaderRow: 3,
+      ignoredRows: 2,
+      headers: ['客户名称', '国家', '城市', 'WhatsApp', '常买品类', '常用尺码', '备注'],
+    });
+    expect(converted?.rows).toEqual([
+      ['备注客户', 'Nigeria', '', '+234 800 000 0001', '', '', 'WhatsApp标签：VIP；WhatsApp Business账号'],
+      ['公开客户二', 'Togo', '', '+228 90 00 00 01', '', '', ''],
+    ]);
+  });
+
   it('automatically maps common Chinese column names and ignores extra columns', () => {
     const parsed = {
       sheetName: 'Sheet1',

@@ -43,6 +43,9 @@ export interface ParsedSpreadsheet {
   sheetName: string;
   headers: string[];
   rows: string[][];
+  detectedFormat?: 'whatsapp-contacts';
+  sourceHeaderRow?: number;
+  ignoredRows?: number;
 }
 
 export interface MappedImportRow {
