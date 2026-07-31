@@ -2,10 +2,11 @@
 
 import { usePathname } from 'next/navigation';
 import { MobileSidebar } from './sidebar';
-import { Bell, Search } from 'lucide-react';
+import { Bell, Cloud, CloudOff, LoaderCircle, Search } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
+import { useBusinessState } from '@/lib/state/provider';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -32,14 +33,40 @@ const pageTitles: Record<string, string> = {
 
 export function AppHeader() {
   const pathname = usePathname();
+  const { syncStatus, syncError, retrySync } = useBusinessState();
   const basePath = '/' + (pathname.split('/')[1] || '');
   const title = pageTitles[basePath] || pageTitles[pathname] || 'Helen服装批发管理系统';
+  const syncLabel =
+    syncStatus === 'synced'
+      ? '已同步'
+      : syncStatus === 'error'
+        ? '同步失败'
+        : syncStatus === 'loading'
+          ? '连接数据库'
+          : '同步中';
 
   return (
     <header className="sticky top-0 z-30 flex h-14 items-center gap-4 border-b bg-white px-4 lg:px-6">
       <MobileSidebar />
       <h1 className="text-lg font-semibold text-[#1f2937]">{title}</h1>
       <div className="ml-auto flex items-center gap-3">
+        <Button
+          type="button"
+          variant="ghost"
+          size="sm"
+          className={syncStatus === 'error' ? 'text-red-600 hover:text-red-700' : 'text-muted-foreground'}
+          onClick={syncStatus === 'error' ? retrySync : undefined}
+          disabled={syncStatus === 'loading' || syncStatus === 'syncing'}
+          title={syncError ?? syncLabel}
+          aria-label={syncStatus === 'error' ? `${syncLabel}，点击重试` : syncLabel}
+        >
+          {syncStatus === 'synced' && <Cloud className="h-4 w-4" />}
+          {syncStatus === 'error' && <CloudOff className="h-4 w-4" />}
+          {(syncStatus === 'loading' || syncStatus === 'syncing') && (
+            <LoaderCircle className="h-4 w-4 animate-spin" />
+          )}
+          <span className="hidden text-xs sm:inline">{syncLabel}</span>
+        </Button>
         <div className="relative hidden md:block">
           <Search className="absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
           <Input

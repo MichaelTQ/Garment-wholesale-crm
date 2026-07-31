@@ -1,6 +1,6 @@
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
 
-let _clientCache: Map<string, SupabaseClient> = new Map();
+const _clientCache: Map<string, SupabaseClient> = new Map();
 
 function getSupabaseCredentials(): { url: string; anonKey: string } {
   const url = process.env.COZE_SUPABASE_URL;

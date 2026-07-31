@@ -68,9 +68,11 @@ import type {
   ProductionInboundCommand,
 } from '@/lib/types/inventory';
 
-type BusinessAction =
-  | { type: 'REPLACE_STATE'; state: BusinessState }
-  | { type: 'RESET_STATE' };
+const BUSINESS_SYNC_PENDING_KEY = `${BUSINESS_STORAGE_KEY}:sync-pending`;
+
+export type BusinessSyncStatus = 'loading' | 'syncing' | 'synced' | 'error';
+
+type BusinessAction = { type: 'REPLACE_STATE'; state: BusinessState };
 
 function createInitialState(): BusinessState {
   return deriveBusinessState({
@@ -121,7 +123,6 @@ function createInitialState(): BusinessState {
 
 function businessReducer(state: BusinessState, action: BusinessAction): BusinessState {
   if (action.type === 'REPLACE_STATE') return action.state;
-  if (action.type === 'RESET_STATE') return createInitialState();
   return state;
 }
 
@@ -214,6 +215,9 @@ async function syncToSupabase(state: BusinessState): Promise<string | null> {
 
 interface BusinessContextValue extends BusinessState {
   hydrated: boolean;
+  syncStatus: BusinessSyncStatus;
+  syncError: string | null;
+  retrySync: () => void;
   productionInbound: (command: ProductionInboundCommand) => BusinessOperationResult;
   manualInbound: (command: ManualInboundCommand) => BusinessOperationResult;
   newProductInbound: (command: NewProductInboundCommand) => BusinessOperationResult;
@@ -237,32 +241,80 @@ const BusinessContext = createContext<BusinessContextValue | null>(null);
 export function BusinessProvider({ children }: { children: ReactNode }) {
   const [state, dispatch] = useReducer(businessReducer, undefined, createInitialState);
   const [hydrated, setHydrated] = useState(false);
+  const [syncStatus, setSyncStatus] = useState<BusinessSyncStatus>('loading');
+  const [syncError, setSyncError] = useState<string | null>(null);
   const stateRef = useRef(state);
-  const syncTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const hydratedRef = useRef(false);
+  const pendingSyncRef = useRef<BusinessState | null>(null);
+  const syncingRef = useRef(false);
+
+  const markLocalSyncPending = useCallback((pending: boolean) => {
+    try {
+      if (pending) {
+        window.localStorage.setItem(BUSINESS_SYNC_PENDING_KEY, '1');
+      } else {
+        window.localStorage.removeItem(BUSINESS_SYNC_PENDING_KEY);
+      }
+    } catch {
+      // ignore
+    }
+  }, []);
+
+  const flushSyncQueue = useCallback(async () => {
+    if (syncingRef.current) return;
+    syncingRef.current = true;
+
+    try {
+      while (pendingSyncRef.current) {
+        const snapshot = pendingSyncRef.current;
+        pendingSyncRef.current = null;
+        setSyncStatus('syncing');
+        setSyncError(null);
+
+        const error = await syncToSupabase(snapshot);
+        if (error) {
+          // 保留失败快照供用户重试；期间产生的新状态优先。
+          pendingSyncRef.current ??= snapshot;
+          setSyncStatus('error');
+          setSyncError(error);
+          console.error('[BusinessProvider] 数据库同步失败:', error);
+          return;
+        }
+      }
+
+      markLocalSyncPending(false);
+      setSyncStatus('synced');
+      setSyncError(null);
+    } finally {
+      syncingRef.current = false;
+    }
+  }, [markLocalSyncPending]);
+
+  // 本地缓存立即写入；数据库请求串行执行并自动合并连续变更。
+  const scheduleSync = useCallback((nextState: BusinessState) => {
+    try {
+      window.localStorage.setItem(BUSINESS_STORAGE_KEY, JSON.stringify(nextState));
+    } catch {
+      // ignore
+    }
+    markLocalSyncPending(true);
+    pendingSyncRef.current = nextState;
+    void flushSyncQueue();
+  }, [flushSyncQueue, markLocalSyncPending]);
 
   const replaceState = useCallback((nextState: BusinessState) => {
     const derived = deriveBusinessState(nextState);
     stateRef.current = derived;
     dispatch({ type: 'REPLACE_STATE', state: derived });
-  }, []);
-
-  // 防抖同步到 Supabase + localStorage
-  const scheduleSync = useCallback((s: BusinessState) => {
-    // localStorage 即时写入（快速恢复）
-    try {
-      window.localStorage.setItem(BUSINESS_STORAGE_KEY, JSON.stringify(s));
-    } catch {
-      // ignore
+    if (hydratedRef.current) {
+      scheduleSync(derived);
     }
-    // Supabase 防抖写入（1秒）
-    if (syncTimerRef.current) clearTimeout(syncTimerRef.current);
-    syncTimerRef.current = setTimeout(async () => {
-      const error = await syncToSupabase(s);
-      if (error) {
-        console.error('[BusinessProvider] 数据库同步失败:', error);
-      }
-    }, 1000);
-  }, []);
+    return derived;
+  }, [scheduleSync]);
+
+  const retrySync = useCallback(() => {
+    scheduleSync(stateRef.current);
+  }, [scheduleSync]);
 
   // 初始化：优先从 Supabase 加载，回退到 localStorage
   useEffect(() => {
@@ -271,8 +323,11 @@ export function BusinessProvider({ children }: { children: ReactNode }) {
     async function hydrate() {
       // 1. 先尝试 localStorage（快速显示）
       let localState: BusinessState | null = null;
+      let hasPendingLocalSync = false;
       try {
         const raw = window.localStorage.getItem(BUSINESS_STORAGE_KEY);
+        hasPendingLocalSync =
+          window.localStorage.getItem(BUSINESS_SYNC_PENDING_KEY) === '1';
         if (raw) {
           localState = normalizeStoredState(JSON.parse(raw) as unknown);
         }
@@ -280,41 +335,44 @@ export function BusinessProvider({ children }: { children: ReactNode }) {
         window.localStorage.removeItem(BUSINESS_STORAGE_KEY);
       }
 
-      if (localState) {
-        replaceState(localState);
-        setHydrated(true);
-      }
-
       // 2. 再从 Supabase 加载（权威数据源）
       const dbState = await loadFromSupabase();
       if (cancelled) return;
 
-      if (dbState) {
-        replaceState(dbState);
-        // 同步更新 localStorage
+      // 本地存在尚未上传的变更时，禁止旧数据库快照覆盖本地状态。
+      const selectedState =
+        localState && hasPendingLocalSync
+          ? localState
+          : dbState ?? localState ?? stateRef.current;
+      const derivedState = replaceState(selectedState);
+
+      if (dbState && !hasPendingLocalSync) {
         try {
-          window.localStorage.setItem(BUSINESS_STORAGE_KEY, JSON.stringify(dbState));
+          window.localStorage.setItem(
+            BUSINESS_STORAGE_KEY,
+            JSON.stringify(derivedState),
+          );
         } catch {
           // ignore
         }
-      } else if (!localState) {
-        // Supabase 加载失败且 localStorage 也没有数据，使用初始 mock 数据
-        // 不做任何操作，state 已经是初始值
       }
 
+      hydratedRef.current = true;
       setHydrated(true);
+      if (localState && hasPendingLocalSync) {
+        scheduleSync(derivedState);
+      } else if (dbState) {
+        markLocalSyncPending(false);
+        setSyncStatus('synced');
+      } else {
+        setSyncStatus('error');
+        setSyncError('数据库连接失败，当前显示本机缓存数据');
+      }
     }
 
     hydrate();
     return () => { cancelled = true; };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [replaceState]);
-
-  // 状态变更时同步
-  useEffect(() => {
-    if (!hydrated) return;
-    scheduleSync(state);
-  }, [hydrated, state, scheduleSync]);
+  }, [markLocalSyncPending, replaceState, scheduleSync]);
 
   const runTransaction = useCallback(
     (
@@ -539,16 +597,16 @@ export function BusinessProvider({ children }: { children: ReactNode }) {
   );
 
   const resetBusinessData = useCallback(() => {
-    const emptyState = createInitialState();
-    stateRef.current = emptyState;
-    window.localStorage.removeItem(BUSINESS_STORAGE_KEY);
-    dispatch({ type: 'RESET_STATE' });
-  }, []);
+    replaceState(createInitialState());
+  }, [replaceState]);
 
   const value = useMemo<BusinessContextValue>(
     () => ({
       ...state,
       hydrated,
+      syncStatus,
+      syncError,
+      retrySync,
       productionInbound,
       manualInbound,
       newProductInbound,
@@ -569,6 +627,9 @@ export function BusinessProvider({ children }: { children: ReactNode }) {
     [
       state,
       hydrated,
+      syncStatus,
+      syncError,
+      retrySync,
       productionInbound,
       manualInbound,
       newProductInbound,

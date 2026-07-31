@@ -1,6 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSupabaseClient, isSupabaseConfigured } from '@/storage/database/supabase-client';
 import type { BusinessState } from '@/lib/types/business';
+import {
+  createShipmentItemId,
+  DATABASE_ID_MAX_LENGTH,
+} from '@/lib/database-id';
 
 /**
  * 将前端 BusinessState 全量同步到 Supabase
@@ -21,12 +25,77 @@ function toSnakeCase(obj: any): Record<string, unknown> {
   return result;
 }
 
+function assertDatabaseCompatibleIds(state: BusinessState): void {
+  const assertId = (label: string, value: string | undefined) => {
+    if (!value) return;
+    if (value.length > DATABASE_ID_MAX_LENGTH) {
+      throw new Error(
+        `${label} 的 ID“${value}”超过数据库 ${DATABASE_ID_MAX_LENGTH} 位限制，请重新创建该记录`,
+      );
+    }
+  };
+
+  for (const warehouse of state.warehouses || []) {
+    assertId('仓库', warehouse.id);
+  }
+  for (const customer of state.customers || []) {
+    assertId('客户', customer.id);
+  }
+  for (const product of state.products || []) {
+    assertId('商品', product.id);
+  }
+  for (const factory of state.factories || []) {
+    assertId('工厂', factory.id);
+  }
+  for (const batch of state.productionBatches || []) {
+    assertId('生产批次', batch.id);
+    assertId('生产批次工厂', batch.factoryId);
+    assertId('生产批次商品', batch.productId);
+  }
+  for (const order of state.orders || []) {
+    assertId('订单', order.id);
+    assertId('订单客户', order.customerId);
+    for (const item of order.items || []) {
+      assertId('订单明细', item.id);
+      assertId('订单明细商品', item.productId);
+    }
+  }
+  for (const shipment of state.shipments || []) {
+    assertId('发货单', shipment.id);
+    assertId('发货单订单', shipment.orderId);
+    assertId('发货单客户', shipment.customerId);
+  }
+  for (const payment of state.payments || []) {
+    assertId('收款', payment.id);
+    assertId('收款客户', payment.customerId);
+    assertId('收款关联订单', payment.relatedOrderId);
+  }
+  for (const payment of state.factoryPayments || []) {
+    assertId('工厂付款', payment.id);
+    assertId('工厂付款工厂', payment.factoryId);
+    assertId('工厂付款批次', payment.relatedBatchId);
+  }
+  for (const record of state.inventoryRecords || []) {
+    assertId('库存记录', record.id);
+    assertId('库存记录仓库', record.warehouseId);
+  }
+  for (const flow of state.inventoryFlows || []) {
+    assertId('库存流水', flow.id);
+  }
+  for (const entries of Object.values(state.customerLedgers || {})) {
+    for (const entry of entries) {
+      assertId('客户往来流水', entry.id);
+    }
+  }
+}
+
 export async function syncFullState(state: BusinessState): Promise<SyncResult> {
   if (!isSupabaseConfigured()) {
     return { ok: false, error: 'Supabase 未配置' };
   }
   const client = getSupabaseClient();
   try {
+    assertDatabaseCompatibleIds(state);
 
     // Helper: batch sync (upsert by primary key 'id')
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -187,9 +256,9 @@ export async function syncFullState(state: BusinessState): Promise<SyncResult> {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const shipmentItemRows: any[] = [];
     for (const shipment of (state.shipments || [])) {
-      for (const item of (shipment.items || [])) {
+      for (const [itemIndex, item] of (shipment.items || []).entries()) {
         shipmentItemRows.push({
-          id: `si_${shipment.id}_${item.orderItemId || Math.random().toString(36).slice(2)}`,
+          id: createShipmentItemId(shipment.id, item.orderItemId || '', itemIndex),
           shipment_id: shipment.id,
           order_item_id: item.orderItemId || '',
           style_no: item.styleNo, color: item.color, size: item.size,

@@ -5,7 +5,7 @@ const nextConfig: NextConfig = {
   /* config options here */
   allowedDevOrigins: ['*.dev.coze.site'],
   turbopack: {
-    root: '..',
+    root: process.cwd(),
   },
   images: {
     remotePatterns: [

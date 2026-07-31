@@ -26,6 +26,19 @@ coze build
 coze start
 ```
 
+### 配置跨设备数据库
+
+部署环境必须配置以下服务端环境变量，否则数据只会保留在当前浏览器：
+
+```bash
+COZE_SUPABASE_URL=https://your-project.supabase.co
+COZE_SUPABASE_ANON_KEY=your-anon-key
+COZE_SUPABASE_SERVICE_ROLE_KEY=your-service-role-key
+```
+
+`COZE_SUPABASE_SERVICE_ROLE_KEY` 不得使用 `NEXT_PUBLIC_` 前缀或暴露到浏览器。
+登录系统后可通过顶部状态查看数据库是否“已同步”；“同步失败”时可点击重试并查看错误提示。
+
 ## 项目结构
 
 ```

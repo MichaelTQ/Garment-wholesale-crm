@@ -7,6 +7,7 @@ import type {
   InboundResult,
   SkuKey,
 } from '@/lib/types/inventory';
+import { createDatabaseId } from '@/lib/database-id';
 
 // ============================================================
 // 工具函数
@@ -24,8 +25,7 @@ export function getRemainingInboundQuantity(batch: ProductionBatch): number {
 
 /** 生成唯一 ID（纯函数版本，接受时间戳参数以保证可测试性） */
 export function generateId(prefix: string, now?: number): string {
-  const ts = now ?? Date.now();
-  return `${prefix}${ts.toString(36)}`;
+  return createDatabaseId(prefix, now);
 }
 
 /** 生成入库流水编号 */

@@ -3,6 +3,7 @@ import {
   calculateSellableStock,
   findInventoryIndex,
 } from '@/lib/services/inventory';
+import { createDatabaseId } from '@/lib/database-id';
 import type {
   Customer,
   CustomerLedger,
@@ -38,11 +39,7 @@ const ACTIVE_ORDER_STATUSES: Order['status'][] = [
 ];
 
 export function createBusinessId(prefix: string): string {
-  const randomPart =
-    typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
-      ? crypto.randomUUID().replaceAll('-', '').slice(0, 12)
-      : `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 7)}`;
-  return `${prefix}-${randomPart}`;
+  return createDatabaseId(prefix);
 }
 
 export function createDocumentNo(prefix: string, date: string, sequence: number): string {
