@@ -45,6 +45,13 @@ import {
   registerManualInbound,
   registerProductionInbound,
 } from '@/lib/services/inventory';
+import {
+  deleteCustomersTransaction,
+  deleteFactoriesTransaction,
+  deleteInboundFlowsTransaction,
+  deleteOrdersTransaction,
+  deleteProductsTransaction,
+} from '@/lib/services/deletion';
 import type {
   ApplyDepositCommand,
   CreateOrderCommand,
@@ -168,7 +175,10 @@ function normalizeStoredState(value: unknown): BusinessState | null {
 /** 从 Supabase 加载全量业务数据 */
 async function loadFromSupabase(): Promise<BusinessState | null> {
   try {
-    const res = await fetch('/api/db/load', { method: 'POST' });
+    const res = await fetch('/api/db/load', {
+      method: 'POST',
+      cache: 'no-store',
+    });
     if (!res.ok) {
       console.warn('从数据库加载失败，HTTP', res.status);
       return null;
@@ -224,6 +234,11 @@ interface BusinessContextValue extends BusinessState {
   addProduct: (product: Product) => BusinessOperationResult;
   addCustomer: (input: CustomerInput) => BusinessOperationResult;
   addFactory: (input: FactoryInput) => BusinessOperationResult;
+  deleteCustomers: (ids: string[]) => BusinessOperationResult;
+  deleteProducts: (ids: string[]) => BusinessOperationResult;
+  deleteFactories: (ids: string[]) => BusinessOperationResult;
+  deleteOrders: (ids: string[]) => BusinessOperationResult;
+  deleteInboundFlows: (ids: string[]) => BusinessOperationResult;
   createProductionBatch: (command: CreateProductionBatchCommand) => BusinessOperationResult;
   createFactoryPayment: (command: CreateFactoryPaymentCommand) => BusinessOperationResult;
   createOrder: (command: CreateOrderCommand) => BusinessOperationResult;
@@ -247,6 +262,7 @@ export function BusinessProvider({ children }: { children: ReactNode }) {
   const hydratedRef = useRef(false);
   const pendingSyncRef = useRef<BusinessState | null>(null);
   const syncingRef = useRef(false);
+  const pullingRef = useRef(false);
 
   const markLocalSyncPending = useCallback((pending: boolean) => {
     try {
@@ -316,6 +332,46 @@ export function BusinessProvider({ children }: { children: ReactNode }) {
     scheduleSync(stateRef.current);
   }, [scheduleSync]);
 
+  // 应用其他设备写入的数据库快照，不反向触发同步。
+  const applyRemoteState = useCallback((remoteState: BusinessState) => {
+    const current = stateRef.current;
+    const remoteOrderIds = new Set(remoteState.orders.map((item) => item.id));
+    const remoteCustomerIds = new Set(
+      remoteState.customers.map((item) => item.id),
+    );
+    const remotePaymentIds = new Set(
+      remoteState.payments.map((item) => item.id),
+    );
+    const merged = deriveBusinessState({
+      ...remoteState,
+      // 这三类运行时明细尚无独立数据库表；保留本机仍有有效主记录的部分。
+      inventoryReservations: current.inventoryReservations.filter((item) =>
+        remoteOrderIds.has(item.orderId),
+      ),
+      paymentAllocations: current.paymentAllocations.filter(
+        (item) =>
+          remoteOrderIds.has(item.orderId) &&
+          remotePaymentIds.has(item.paymentId),
+      ),
+      depositApplications: current.depositApplications.filter(
+        (item) =>
+          remoteOrderIds.has(item.orderId) &&
+          remoteCustomerIds.has(item.customerId),
+      ),
+    });
+    if (JSON.stringify(merged) === JSON.stringify(current)) return;
+
+    stateRef.current = merged;
+    dispatch({ type: 'REPLACE_STATE', state: merged });
+    try {
+      window.localStorage.setItem(BUSINESS_STORAGE_KEY, JSON.stringify(merged));
+    } catch {
+      // ignore
+    }
+    setSyncStatus('synced');
+    setSyncError(null);
+  }, []);
+
   // 初始化：优先从 Supabase 加载，回退到 localStorage
   useEffect(() => {
     let cancelled = false;
@@ -373,6 +429,50 @@ export function BusinessProvider({ children }: { children: ReactNode }) {
     hydrate();
     return () => { cancelled = true; };
   }, [markLocalSyncPending, replaceState, scheduleSync]);
+
+  // 其他设备写入后，当前可见页面会在 5 秒内自动刷新数据。
+  useEffect(() => {
+    if (!hydrated) return;
+    let cancelled = false;
+
+    const pullLatest = async () => {
+      if (
+        cancelled ||
+        document.visibilityState !== 'visible' ||
+        pullingRef.current ||
+        syncingRef.current ||
+        pendingSyncRef.current
+      ) {
+        return;
+      }
+      pullingRef.current = true;
+      try {
+        const remoteState = await loadFromSupabase();
+        if (!cancelled && remoteState) applyRemoteState(remoteState);
+      } finally {
+        pullingRef.current = false;
+      }
+    };
+
+    const handleFocus = () => {
+      void pullLatest();
+    };
+    const handleVisibility = () => {
+      if (document.visibilityState === 'visible') void pullLatest();
+    };
+    const intervalId = window.setInterval(() => {
+      void pullLatest();
+    }, 5_000);
+
+    window.addEventListener('focus', handleFocus);
+    document.addEventListener('visibilitychange', handleVisibility);
+    return () => {
+      cancelled = true;
+      window.clearInterval(intervalId);
+      window.removeEventListener('focus', handleFocus);
+      document.removeEventListener('visibilitychange', handleVisibility);
+    };
+  }, [applyRemoteState, hydrated]);
 
   const runTransaction = useCallback(
     (
@@ -467,6 +567,36 @@ export function BusinessProvider({ children }: { children: ReactNode }) {
   const addFactory = useCallback(
     (input: FactoryInput): BusinessOperationResult =>
       runTransaction((current) => addFactoryTransaction(current, input)),
+    [runTransaction],
+  );
+
+  const deleteCustomers = useCallback(
+    (ids: string[]): BusinessOperationResult =>
+      runTransaction((current) => deleteCustomersTransaction(current, ids)),
+    [runTransaction],
+  );
+
+  const deleteProducts = useCallback(
+    (ids: string[]): BusinessOperationResult =>
+      runTransaction((current) => deleteProductsTransaction(current, ids)),
+    [runTransaction],
+  );
+
+  const deleteFactories = useCallback(
+    (ids: string[]): BusinessOperationResult =>
+      runTransaction((current) => deleteFactoriesTransaction(current, ids)),
+    [runTransaction],
+  );
+
+  const deleteOrders = useCallback(
+    (ids: string[]): BusinessOperationResult =>
+      runTransaction((current) => deleteOrdersTransaction(current, ids)),
+    [runTransaction],
+  );
+
+  const deleteInboundFlows = useCallback(
+    (ids: string[]): BusinessOperationResult =>
+      runTransaction((current) => deleteInboundFlowsTransaction(current, ids)),
     [runTransaction],
   );
 
@@ -613,6 +743,11 @@ export function BusinessProvider({ children }: { children: ReactNode }) {
       addProduct,
       addCustomer,
       addFactory,
+      deleteCustomers,
+      deleteProducts,
+      deleteFactories,
+      deleteOrders,
+      deleteInboundFlows,
       createProductionBatch,
       createFactoryPayment,
       createOrder,
@@ -636,6 +771,11 @@ export function BusinessProvider({ children }: { children: ReactNode }) {
       addProduct,
       addCustomer,
       addFactory,
+      deleteCustomers,
+      deleteProducts,
+      deleteFactories,
+      deleteOrders,
+      deleteInboundFlows,
       createProductionBatch,
       createFactoryPayment,
       createOrder,

@@ -22,11 +22,13 @@ import {
   type ProductFormValue,
 } from '@/lib/types/product';
 import { createBusinessId } from '@/lib/services/business';
+import { Checkbox } from '@/components/ui/checkbox';
+import { BatchDeleteButton } from '@/components/batch-delete-button';
 
 const statusOptions = ['全部', '设计中', '生产中', '已上新', '正常销售', '库存不足', '已停售'];
 
 export default function ProductsPage() {
-  const { products, addProduct } = useBusinessState();
+  const { products, addProduct, deleteProducts } = useBusinessState();
   const [search, setSearch] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('全部');
   const [statusFilter, setStatusFilter] = useState('全部');
@@ -34,6 +36,7 @@ export default function ProductsPage() {
   const [productForm, setProductForm] = useState<ProductFormValue>(emptyProductFormValue);
   const [formErrors, setFormErrors] = useState<string[]>([]);
   const [currentPage, setCurrentPage] = useState(1);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const pageSize = 10;
   const categories = [...new Set([
     ...DEFAULT_PRODUCT_CATEGORIES,
@@ -79,6 +82,40 @@ export default function ProductsPage() {
 
   const totalPages = Math.ceil(filtered.length / pageSize);
   const paginatedData = filtered.slice((currentPage - 1) * pageSize, currentPage * pageSize);
+  const pageIds = paginatedData.map((item) => item.id);
+  const allPageSelected =
+    pageIds.length > 0 && pageIds.every((id) => selectedIds.has(id));
+  const somePageSelected = pageIds.some((id) => selectedIds.has(id));
+
+  const toggleSelected = (id: string, checked: boolean) => {
+    setSelectedIds((current) => {
+      const next = new Set(current);
+      if (checked) next.add(id);
+      else next.delete(id);
+      return next;
+    });
+  };
+
+  const toggleCurrentPage = (checked: boolean) => {
+    setSelectedIds((current) => {
+      const next = new Set(current);
+      for (const id of pageIds) {
+        if (checked) next.add(id);
+        else next.delete(id);
+      }
+      return next;
+    });
+  };
+
+  const handleDeleteSelected = () => {
+    const result = deleteProducts([...selectedIds]);
+    if (!result.ok) {
+      toast.error(result.error);
+      return;
+    }
+    toast.success(`已删除 ${selectedIds.size} 个商品，正在同步数据库`);
+    setSelectedIds(new Set());
+  };
 
   return (
     <div className="space-y-4">
@@ -103,7 +140,12 @@ export default function ProductsPage() {
                 {statusOptions.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}
               </SelectContent>
             </Select>
-            <div className="ml-auto">
+            <div className="ml-auto flex gap-2">
+              <BatchDeleteButton
+                count={selectedIds.size}
+                entityLabel="商品"
+                onConfirm={handleDeleteSelected}
+              />
               <Button size="sm" className="h-9 bg-[#1e3a5f] hover:bg-[#2d5a8e]" onClick={() => setShowAddDialog(true)}>
                 <Plus className="h-4 w-4 mr-1" /> 新增商品
               </Button>
@@ -119,6 +161,19 @@ export default function ProductsPage() {
             <Table>
               <TableHeader>
                 <TableRow>
+                  <TableHead className="w-10">
+                    <Checkbox
+                      checked={
+                        allPageSelected
+                          ? true
+                          : somePageSelected
+                            ? 'indeterminate'
+                            : false
+                      }
+                      onCheckedChange={(checked) => toggleCurrentPage(checked === true)}
+                      aria-label="选择当前页商品"
+                    />
+                  </TableHead>
                   <TableHead className="text-xs">图片</TableHead>
                   <TableHead className="text-xs">款号</TableHead>
                   <TableHead className="text-xs">商品名称</TableHead>
@@ -135,6 +190,13 @@ export default function ProductsPage() {
               <TableBody>
                 {paginatedData.map(p => (
                   <TableRow key={p.id}>
+                    <TableCell>
+                      <Checkbox
+                        checked={selectedIds.has(p.id)}
+                        onCheckedChange={(checked) => toggleSelected(p.id, checked === true)}
+                        aria-label={`选择商品 ${p.styleNo}`}
+                      />
+                    </TableCell>
                     <TableCell>
                       <div className="h-10 w-10 rounded bg-[#f5f6fa] flex items-center justify-center text-xs text-muted-foreground border">
                         {p.styleNo.slice(0, 2)}

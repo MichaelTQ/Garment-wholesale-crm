@@ -8,7 +8,7 @@ import {
 
 /**
  * 将前端 BusinessState 全量同步到 Supabase
- * 策略：先清空所有表，再批量插入
+ * 策略：先按主键批量更新，再按外键顺序删除快照中已不存在的记录
  */
 export interface SyncResult {
   ok: boolean;
@@ -128,6 +128,31 @@ export async function syncFullState(state: BusinessState): Promise<SyncResult> {
         if (upError) {
           console.error(`upsert ${table} 失败:`, upError.message, 'batch:', i);
           throw new Error(`插入 ${table} 失败: ${upError.message}`);
+        }
+      }
+    }
+
+    // 删除数据库中已不在前端权威快照里的记录，按外键依赖分批执行。
+    async function deleteMissingRows(
+      table: string,
+      currentIds: string[],
+    ): Promise<void> {
+      const { data, error: selectError } = await client.from(table).select('id');
+      if (selectError) {
+        throw new Error(`检查 ${table} 删除项失败: ${selectError.message}`);
+      }
+      const currentIdSet = new Set(currentIds);
+      const staleIds = ((data || []) as Array<{ id: string }>)
+        .map((item) => item.id)
+        .filter((id) => !currentIdSet.has(id));
+      for (let index = 0; index < staleIds.length; index += 100) {
+        const batch = staleIds.slice(index, index + 100);
+        const { error: deleteError } = await client
+          .from(table)
+          .delete()
+          .in('id', batch);
+        if (deleteError) {
+          throw new Error(`删除 ${table} 失败: ${deleteError.message}`);
         }
       }
     }
@@ -337,6 +362,64 @@ export async function syncFullState(state: BusinessState): Promise<SyncResult> {
       }
     }
     await syncTable('customer_ledgers', ledgerRows);
+
+    // 子表先删、主表后删，确保删除后的数据库与当前 BusinessState 完全一致。
+    await deleteMissingRows(
+      'shipment_items',
+      shipmentItemRows.map((item) => String(item.id)),
+    );
+    await deleteMissingRows(
+      'factory_payments',
+      (state.factoryPayments || []).map((item) => item.id),
+    );
+    await deleteMissingRows(
+      'shipments',
+      (state.shipments || []).map((item) => item.id),
+    );
+    await deleteMissingRows(
+      'payments',
+      (state.payments || []).map((item) => item.id),
+    );
+    await deleteMissingRows(
+      'order_items',
+      orderItemRows.map((item) => String(item.id)),
+    );
+    await deleteMissingRows(
+      'customer_ledgers',
+      ledgerRows.map((item) => String(item.id)),
+    );
+    await deleteMissingRows(
+      'production_batches',
+      (state.productionBatches || []).map((item) => item.id),
+    );
+    await deleteMissingRows(
+      'inventory_flows',
+      (state.inventoryFlows || []).map((item) => item.id),
+    );
+    await deleteMissingRows(
+      'inventory_records',
+      (state.inventoryRecords || []).map((item) => item.id),
+    );
+    await deleteMissingRows(
+      'orders',
+      (state.orders || []).map((item) => item.id),
+    );
+    await deleteMissingRows(
+      'factories',
+      (state.factories || []).map((item) => item.id),
+    );
+    await deleteMissingRows(
+      'products',
+      (state.products || []).map((item) => item.id),
+    );
+    await deleteMissingRows(
+      'customers',
+      (state.customers || []).map((item) => item.id),
+    );
+    await deleteMissingRows(
+      'warehouses',
+      (state.warehouses || []).map((item) => item.id),
+    );
 
     return { ok: true };
   } catch (error: unknown) {

@@ -10,18 +10,20 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
-import { Search, Plus, Upload, Eye, Edit, Trash2 } from 'lucide-react';
+import { Search, Plus, Upload, Eye, Edit } from 'lucide-react';
 import { formatCurrency, getStatusColor } from '@/lib/mock-data';
 import { toast } from 'sonner';
 import { useBusinessState } from '@/lib/state/provider';
 import { splitFormList } from '@/lib/types/product';
 import { formatCustomerNo } from '@/lib/business-number';
+import { Checkbox } from '@/components/ui/checkbox';
+import { BatchDeleteButton } from '@/components/batch-delete-button';
 
 const defaultCountries = ['尼日利亚', '加纳', '肯尼亚', '坦桑尼亚', '南非', '刚果（金）', '安哥拉', '其他'];
 const statusOptions = ['全部', '活跃', '一般', '长期未购买', '有欠款', '有预存款'];
 
 export default function CustomersPage() {
-  const { customers, addCustomer } = useBusinessState();
+  const { customers, addCustomer, deleteCustomers } = useBusinessState();
   const [search, setSearch] = useState('');
   const [countryFilter, setCountryFilter] = useState('全部');
   const [statusFilter, setStatusFilter] = useState('全部');
@@ -33,6 +35,7 @@ export default function CustomersPage() {
   const [categoriesInput, setCategoriesInput] = useState('');
   const [notes, setNotes] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const pageSize = 10;
   const countries = [...new Set([...defaultCountries, ...customers.map((c) => c.country)])];
 
@@ -72,6 +75,40 @@ export default function CustomersPage() {
 
   const totalPages = Math.ceil(filtered.length / pageSize);
   const paginatedData = filtered.slice((currentPage - 1) * pageSize, currentPage * pageSize);
+  const pageIds = paginatedData.map((item) => item.id);
+  const allPageSelected =
+    pageIds.length > 0 && pageIds.every((id) => selectedIds.has(id));
+  const somePageSelected = pageIds.some((id) => selectedIds.has(id));
+
+  const toggleSelected = (id: string, checked: boolean) => {
+    setSelectedIds((current) => {
+      const next = new Set(current);
+      if (checked) next.add(id);
+      else next.delete(id);
+      return next;
+    });
+  };
+
+  const toggleCurrentPage = (checked: boolean) => {
+    setSelectedIds((current) => {
+      const next = new Set(current);
+      for (const id of pageIds) {
+        if (checked) next.add(id);
+        else next.delete(id);
+      }
+      return next;
+    });
+  };
+
+  const handleDeleteSelected = () => {
+    const result = deleteCustomers([...selectedIds]);
+    if (!result.ok) {
+      toast.error(result.error);
+      return;
+    }
+    toast.success(`已删除 ${selectedIds.size} 位客户，正在同步数据库`);
+    setSelectedIds(new Set());
+  };
 
   return (
     <div className="space-y-4">
@@ -102,6 +139,11 @@ export default function CustomersPage() {
               </SelectContent>
             </Select>
             <div className="ml-auto flex gap-2">
+              <BatchDeleteButton
+                count={selectedIds.size}
+                entityLabel="客户"
+                onConfirm={handleDeleteSelected}
+              />
               <Button size="sm" className="h-9 bg-[#1e3a5f] hover:bg-[#2d5a8e]" onClick={() => setShowAddDialog(true)}>
                 <Plus className="h-4 w-4 mr-1" /> 新增客户
               </Button>
@@ -120,6 +162,19 @@ export default function CustomersPage() {
             <Table>
               <TableHeader>
                 <TableRow>
+                  <TableHead className="w-10">
+                    <Checkbox
+                      checked={
+                        allPageSelected
+                          ? true
+                          : somePageSelected
+                            ? 'indeterminate'
+                            : false
+                      }
+                      onCheckedChange={(checked) => toggleCurrentPage(checked === true)}
+                      aria-label="选择当前页客户"
+                    />
+                  </TableHead>
                   <TableHead className="text-xs">客户编号</TableHead>
                   <TableHead className="text-xs">客户名称</TableHead>
                   <TableHead className="text-xs">国家</TableHead>
@@ -136,6 +191,13 @@ export default function CustomersPage() {
               <TableBody>
                 {paginatedData.map((c) => (
                   <TableRow key={c.id}>
+                    <TableCell>
+                      <Checkbox
+                        checked={selectedIds.has(c.id)}
+                        onCheckedChange={(checked) => toggleSelected(c.id, checked === true)}
+                        aria-label={`选择客户 ${c.name}`}
+                      />
+                    </TableCell>
                     <TableCell className="text-xs font-medium">{formatCustomerNo(c.id)}</TableCell>
                     <TableCell className="text-xs font-medium">
                       <Link href={`/customers/${c.id}`} className="hover:text-[#1e3a5f] hover:underline">
@@ -160,21 +222,13 @@ export default function CustomersPage() {
                           <Button variant="ghost" size="icon" className="h-7 w-7"><Eye className="h-3.5 w-3.5" /></Button>
                         </Link>
                         <Button variant="ghost" size="icon" className="h-7 w-7"><Edit className="h-3.5 w-3.5" /></Button>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-7 w-7 text-muted-foreground"
-                          onClick={() => toast.info('客户已有业务关联时不能删除；后续可使用“停用”状态')}
-                        >
-                          <Trash2 className="h-3.5 w-3.5" />
-                        </Button>
                       </div>
                     </TableCell>
                   </TableRow>
                 ))}
                 {paginatedData.length === 0 && (
                   <TableRow>
-                    <TableCell colSpan={11} className="h-24 text-center text-sm text-muted-foreground">
+                    <TableCell colSpan={12} className="h-24 text-center text-sm text-muted-foreground">
                       暂无客户，请先新增客户开始业务流程
                     </TableCell>
                   </TableRow>

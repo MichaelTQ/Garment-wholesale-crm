@@ -12,15 +12,18 @@ import { Search, Plus, Eye, Receipt } from 'lucide-react';
 import { formatCurrency, getStatusColor } from '@/lib/mock-data';
 import { toast } from 'sonner';
 import { useBusinessState } from '@/lib/state/provider';
+import { Checkbox } from '@/components/ui/checkbox';
+import { BatchDeleteButton } from '@/components/batch-delete-button';
 
 const orderStatuses = ['全部', '草稿', '待确认', '已确认', '部分发货', '已全部发货', '已完成', '已取消'];
 
 export default function OrdersPage() {
-  const { orders, customers, confirmOrder, cancelOrder } = useBusinessState();
+  const { orders, customers, confirmOrder, cancelOrder, deleteOrders } = useBusinessState();
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('全部');
   const [customerFilter, setCustomerFilter] = useState('全部');
   const [currentPage, setCurrentPage] = useState(1);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const pageSize = 10;
 
   const filtered = orders.filter(o => {
@@ -32,6 +35,40 @@ export default function OrdersPage() {
 
   const totalPages = Math.ceil(filtered.length / pageSize);
   const paginatedData = filtered.slice((currentPage - 1) * pageSize, currentPage * pageSize);
+  const pageIds = paginatedData.map((item) => item.id);
+  const allPageSelected =
+    pageIds.length > 0 && pageIds.every((id) => selectedIds.has(id));
+  const somePageSelected = pageIds.some((id) => selectedIds.has(id));
+
+  const toggleSelected = (id: string, checked: boolean) => {
+    setSelectedIds((current) => {
+      const next = new Set(current);
+      if (checked) next.add(id);
+      else next.delete(id);
+      return next;
+    });
+  };
+
+  const toggleCurrentPage = (checked: boolean) => {
+    setSelectedIds((current) => {
+      const next = new Set(current);
+      for (const id of pageIds) {
+        if (checked) next.add(id);
+        else next.delete(id);
+      }
+      return next;
+    });
+  };
+
+  const handleDeleteSelected = () => {
+    const result = deleteOrders([...selectedIds]);
+    if (!result.ok) {
+      toast.error(result.error);
+      return;
+    }
+    toast.success(`已删除 ${selectedIds.size} 张订单，正在同步数据库`);
+    setSelectedIds(new Set());
+  };
 
   return (
     <div className="space-y-4">
@@ -56,7 +93,12 @@ export default function OrdersPage() {
                 {customers.map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
               </SelectContent>
             </Select>
-            <div className="ml-auto">
+            <div className="ml-auto flex gap-2">
+              <BatchDeleteButton
+                count={selectedIds.size}
+                entityLabel="订单"
+                onConfirm={handleDeleteSelected}
+              />
               <Link href="/orders/new">
                 <Button size="sm" className="h-9 bg-[#1e3a5f] hover:bg-[#2d5a8e]">
                   <Plus className="h-4 w-4 mr-1" /> 新建订单
@@ -74,6 +116,19 @@ export default function OrdersPage() {
             <Table>
               <TableHeader>
                 <TableRow>
+                  <TableHead className="w-10">
+                    <Checkbox
+                      checked={
+                        allPageSelected
+                          ? true
+                          : somePageSelected
+                            ? 'indeterminate'
+                            : false
+                      }
+                      onCheckedChange={(checked) => toggleCurrentPage(checked === true)}
+                      aria-label="选择当前页订单"
+                    />
+                  </TableHead>
                   <TableHead className="text-xs">订单编号</TableHead>
                   <TableHead className="text-xs">客户</TableHead>
                   <TableHead className="text-xs">国家</TableHead>
@@ -91,6 +146,13 @@ export default function OrdersPage() {
               <TableBody>
                 {paginatedData.map(o => (
                   <TableRow key={o.id}>
+                    <TableCell>
+                      <Checkbox
+                        checked={selectedIds.has(o.id)}
+                        onCheckedChange={(checked) => toggleSelected(o.id, checked === true)}
+                        aria-label={`选择订单 ${o.orderNo}`}
+                      />
+                    </TableCell>
                     <TableCell className="text-xs font-medium">{o.orderNo}</TableCell>
                     <TableCell className="text-xs max-w-[120px] truncate">
                       <Link href={`/customers/${o.customerId}`} className="hover:text-[#1e3a5f] hover:underline">{o.customerName}</Link>
@@ -152,7 +214,7 @@ export default function OrdersPage() {
                 ))}
                 {paginatedData.length === 0 && (
                   <TableRow>
-                    <TableCell colSpan={12} className="h-24 text-center text-sm text-muted-foreground">
+                    <TableCell colSpan={13} className="h-24 text-center text-sm text-muted-foreground">
                       暂无订单，请先完成客户和商品入库，再创建订单
                     </TableCell>
                   </TableRow>

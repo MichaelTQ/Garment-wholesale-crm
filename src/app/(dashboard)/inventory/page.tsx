@@ -14,9 +14,18 @@ import { getStatusColor } from '@/lib/mock-data';
 import { useBusinessState } from '@/lib/state/provider';
 import { InboundDialog } from '@/components/inbound/inbound-dialog';
 import { toast } from 'sonner';
+import { Checkbox } from '@/components/ui/checkbox';
+import { BatchDeleteButton } from '@/components/batch-delete-button';
 
 export default function InventoryPage() {
-  const { inventoryRecords, inventoryFlows, products, warehouses, transferStock } = useBusinessState();
+  const {
+    inventoryRecords,
+    inventoryFlows,
+    products,
+    warehouses,
+    transferStock,
+    deleteInboundFlows,
+  } = useBusinessState();
   const [activeTab, setActiveTab] = useState('summary');
   const [showTransferDialog, setShowTransferDialog] = useState(false);
   const [warehouseFilter, setWarehouseFilter] = useState('全部');
@@ -29,6 +38,7 @@ export default function InventoryPage() {
   const [transferQuantity, setTransferQuantity] = useState(0);
   const [transferDate, setTransferDate] = useState('');
   const [transferNotes, setTransferNotes] = useState('');
+  const [selectedFlowIds, setSelectedFlowIds] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     setTransferDate(new Date().toISOString().slice(0, 10));
@@ -76,6 +86,44 @@ export default function InventoryPage() {
   const filteredRecords = warehouseFilter === '全部'
     ? inventoryRecords
     : inventoryRecords.filter(r => r.warehouseId === warehouseFilter);
+  const deletableFlows = inventoryFlows.filter(
+    (flow) =>
+      flow.quantity > 0 &&
+      (flow.type === '生产入库' || flow.type === '手工调整'),
+  );
+  const allFlowsSelected =
+    deletableFlows.length > 0 &&
+    deletableFlows.every((flow) => selectedFlowIds.has(flow.id));
+  const someFlowsSelected = deletableFlows.some((flow) =>
+    selectedFlowIds.has(flow.id),
+  );
+
+  const toggleFlow = (id: string, checked: boolean) => {
+    setSelectedFlowIds((current) => {
+      const next = new Set(current);
+      if (checked) next.add(id);
+      else next.delete(id);
+      return next;
+    });
+  };
+
+  const toggleAllFlows = (checked: boolean) => {
+    setSelectedFlowIds(
+      checked ? new Set(deletableFlows.map((flow) => flow.id)) : new Set(),
+    );
+  };
+
+  const deleteSelectedFlows = () => {
+    const result = deleteInboundFlows([...selectedFlowIds]);
+    if (!result.ok) {
+      toast.error(result.error);
+      return;
+    }
+    toast.success(
+      `已撤销 ${selectedFlowIds.size} 条入库，库存、生产批次和数据库正在同步`,
+    );
+    setSelectedFlowIds(new Set());
+  };
 
   return (
     <div className="space-y-4">
@@ -100,6 +148,13 @@ export default function InventoryPage() {
             <TabsTrigger value="transfer">仓库调拨</TabsTrigger>
           </TabsList>
           <div className="flex items-center gap-2">
+            {activeTab === 'flow' && (
+              <BatchDeleteButton
+                count={selectedFlowIds.size}
+                entityLabel="入库流水"
+                onConfirm={deleteSelectedFlows}
+              />
+            )}
             <Select value={warehouseFilter} onValueChange={setWarehouseFilter}>
               <SelectTrigger className="w-40 h-9"><SelectValue placeholder="按仓库筛选" /></SelectTrigger>
               <SelectContent>
@@ -194,6 +249,21 @@ export default function InventoryPage() {
               <Table>
                 <TableHeader>
                   <TableRow>
+                    <TableHead className="w-10">
+                      <Checkbox
+                        checked={
+                          allFlowsSelected
+                            ? true
+                            : someFlowsSelected
+                              ? 'indeterminate'
+                              : false
+                        }
+                        onCheckedChange={(checked) =>
+                          toggleAllFlows(checked === true)
+                        }
+                        aria-label="选择全部可撤销入库流水"
+                      />
+                    </TableHead>
                     <TableHead className="text-xs">日期</TableHead>
                     <TableHead className="text-xs">类型</TableHead>
                     <TableHead className="text-xs">商品</TableHead>
@@ -210,6 +280,19 @@ export default function InventoryPage() {
                 <TableBody>
                   {inventoryFlows.map(f => (
                     <TableRow key={f.id}>
+                      <TableCell>
+                        <Checkbox
+                          checked={selectedFlowIds.has(f.id)}
+                          disabled={
+                            f.quantity <= 0 ||
+                            !['生产入库', '手工调整'].includes(f.type)
+                          }
+                          onCheckedChange={(checked) =>
+                            toggleFlow(f.id, checked === true)
+                          }
+                          aria-label={`选择库存流水 ${f.id}`}
+                        />
+                      </TableCell>
                       <TableCell className="text-xs">{f.date}</TableCell>
                       <TableCell className="text-xs">
                         <Badge variant="secondary" className="text-[10px] px-1.5 py-0">{f.type}</Badge>

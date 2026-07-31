@@ -326,7 +326,10 @@ export async function POST(request: NextRequest) {
       customerLedgers,
     };
 
-    return NextResponse.json({ ok: true, data: state });
+    return NextResponse.json(
+      { ok: true, data: state },
+      { headers: { 'Cache-Control': 'no-store' } },
+    );
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : '加载数据失败';
     return NextResponse.json({ error: message }, { status: 500 });

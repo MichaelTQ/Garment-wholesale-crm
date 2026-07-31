@@ -17,6 +17,8 @@ import { InboundDialog } from '@/components/inbound/inbound-dialog';
 import { canBatchInbound, getRemainingInboundQuantity } from '@/lib/services/inventory';
 import { toast } from 'sonner';
 import { formatFactoryNo } from '@/lib/business-number';
+import { Checkbox } from '@/components/ui/checkbox';
+import { BatchDeleteButton } from '@/components/batch-delete-button';
 
 export default function FactoriesPage() {
   const {
@@ -26,6 +28,7 @@ export default function FactoriesPage() {
     products,
     warehouses,
     addFactory,
+    deleteFactories,
     createProductionBatch,
     createFactoryPayment,
   } = useBusinessState();
@@ -59,6 +62,7 @@ export default function FactoriesPage() {
   const [paymentMethod, setPaymentMethod] = useState<FactoryPayment['method']>('银行转账');
   const [paymentVoucher, setPaymentVoucher] = useState('');
   const [paymentNotes, setPaymentNotes] = useState('');
+  const [selectedFactoryIds, setSelectedFactoryIds] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     const today = new Date().toISOString().slice(0, 10);
@@ -73,6 +77,34 @@ export default function FactoriesPage() {
   const selectedPaymentBatch = productionBatches.find((batch) => batch.id === paymentBatchId);
 
   const totalUnpaid = factories.reduce((s, f) => s + f.unpaidAmount, 0);
+  const allFactoriesSelected =
+    factories.length > 0 && factories.every((item) => selectedFactoryIds.has(item.id));
+  const someFactoriesSelected = factories.some((item) => selectedFactoryIds.has(item.id));
+
+  const toggleFactory = (id: string, checked: boolean) => {
+    setSelectedFactoryIds((current) => {
+      const next = new Set(current);
+      if (checked) next.add(id);
+      else next.delete(id);
+      return next;
+    });
+  };
+
+  const toggleAllFactories = (checked: boolean) => {
+    setSelectedFactoryIds(
+      checked ? new Set(factories.map((item) => item.id)) : new Set(),
+    );
+  };
+
+  const deleteSelectedFactories = () => {
+    const result = deleteFactories([...selectedFactoryIds]);
+    if (!result.ok) {
+      toast.error(result.error);
+      return;
+    }
+    toast.success(`已删除 ${selectedFactoryIds.size} 家工厂，正在同步数据库`);
+    setSelectedFactoryIds(new Set());
+  };
 
   const handleInboundClick = (batchId: string) => {
     setSelectedBatchId(batchId);
@@ -179,6 +211,13 @@ export default function FactoriesPage() {
             <TabsTrigger value="payments">付款记录</TabsTrigger>
           </TabsList>
           <div className="flex gap-2">
+            {activeTab === 'list' && (
+              <BatchDeleteButton
+                count={selectedFactoryIds.size}
+                entityLabel="工厂"
+                onConfirm={deleteSelectedFactories}
+              />
+            )}
             <Button size="sm" variant="outline" onClick={() => setShowFactoryDialog(true)}>新增工厂</Button>
             <Button size="sm" variant="outline" onClick={() => setShowBatchDialog(true)}>新建生产批次</Button>
             <Button size="sm" className="bg-[#1e3a5f] hover:bg-[#2d5a8e]" onClick={() => setShowPaymentDialog(true)}>登记工厂付款</Button>
@@ -191,6 +230,19 @@ export default function FactoriesPage() {
               <Table>
                 <TableHeader>
                   <TableRow>
+                    <TableHead className="w-10">
+                      <Checkbox
+                        checked={
+                          allFactoriesSelected
+                            ? true
+                            : someFactoriesSelected
+                              ? 'indeterminate'
+                              : false
+                        }
+                        onCheckedChange={(checked) => toggleAllFactories(checked === true)}
+                        aria-label="选择全部工厂"
+                      />
+                    </TableHead>
                     <TableHead className="text-xs">工厂编号</TableHead>
                     <TableHead className="text-xs">工厂名称</TableHead>
                     <TableHead className="text-xs">联系人</TableHead>
@@ -206,6 +258,13 @@ export default function FactoriesPage() {
                 <TableBody>
                   {factories.map(f => (
                     <TableRow key={f.id}>
+                      <TableCell>
+                        <Checkbox
+                          checked={selectedFactoryIds.has(f.id)}
+                          onCheckedChange={(checked) => toggleFactory(f.id, checked === true)}
+                          aria-label={`选择工厂 ${f.name}`}
+                        />
+                      </TableCell>
                       <TableCell className="text-xs font-medium">{formatFactoryNo(f.id)}</TableCell>
                       <TableCell className="text-xs font-medium">{f.name}</TableCell>
                       <TableCell className="text-xs">{f.contact}</TableCell>
@@ -223,7 +282,7 @@ export default function FactoriesPage() {
                     </TableRow>
                   ))}
                   {factories.length === 0 && (
-                    <TableRow><TableCell colSpan={10} className="h-24 text-center text-sm text-muted-foreground">暂无工厂，请先新增工厂</TableCell></TableRow>
+                    <TableRow><TableCell colSpan={11} className="h-24 text-center text-sm text-muted-foreground">暂无工厂，请先新增工厂</TableCell></TableRow>
                   )}
                 </TableBody>
               </Table>
