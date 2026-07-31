@@ -220,9 +220,11 @@ export interface CustomerLedger {
 
 // ============ 仓库 ============
 export const warehouses: Warehouse[] = [
-  { id: 'wh1', name: '广州白云仓', address: '广州市白云区石井镇庆丰路28号' },
-  { id: 'wh2', name: '广州番禺仓', address: '广州市番禺区大龙街市莲路55号' },
-  { id: 'wh3', name: '东莞虎门仓', address: '东莞市虎门镇北栅工业区12号' },
+  { id: 'wh1', name: '广西莉莉', address: '广西' },
+  { id: 'wh2', name: '广西龙生', address: '广西' },
+  { id: 'wh3', name: '广西林生', address: '广西' },
+  { id: 'wh4', name: '新塘张生', address: '广东新塘' },
+  { id: 'wh5', name: '新塘阿峰', address: '广东新塘' },
 ];
 
 // ============ 客户 ============
