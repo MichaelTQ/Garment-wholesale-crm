@@ -24,6 +24,7 @@ import {
 import { createBusinessId } from '@/lib/services/business';
 import { Checkbox } from '@/components/ui/checkbox';
 import { BatchDeleteButton } from '@/components/batch-delete-button';
+import { TablePagination } from '@/components/table-pagination';
 
 const statusOptions = ['全部', '设计中', '生产中', '已上新', '正常销售', '库存不足', '已停售'];
 
@@ -80,7 +81,6 @@ export default function ProductsPage() {
     return matchSearch && matchCategory && matchStatus;
   });
 
-  const totalPages = Math.ceil(filtered.length / pageSize);
   const paginatedData = filtered.slice((currentPage - 1) * pageSize, currentPage * pageSize);
   const pageIds = paginatedData.map((item) => item.id);
   const allPageSelected =
@@ -233,16 +233,7 @@ export default function ProductsPage() {
               </TableBody>
             </Table>
           </div>
-          <div className="flex items-center justify-between border-t px-4 py-3">
-            <span className="text-xs text-muted-foreground">共 {filtered.length} 条记录</span>
-            <div className="flex gap-1">
-              <Button variant="outline" size="sm" className="h-7 text-xs" disabled={currentPage <= 1} onClick={() => setCurrentPage(p => p - 1)}>上一页</Button>
-              {Array.from({ length: totalPages }, (_, i) => (
-                <Button key={i} variant={currentPage === i + 1 ? 'default' : 'outline'} size="sm" className="h-7 w-7 text-xs p-0" onClick={() => setCurrentPage(i + 1)}>{i + 1}</Button>
-              ))}
-              <Button variant="outline" size="sm" className="h-7 text-xs" disabled={currentPage >= totalPages} onClick={() => setCurrentPage(p => p + 1)}>下一页</Button>
-            </div>
-          </div>
+          <TablePagination total={filtered.length} currentPage={currentPage} pageSize={pageSize} onPageChange={setCurrentPage} />
         </CardContent>
       </Card>
 

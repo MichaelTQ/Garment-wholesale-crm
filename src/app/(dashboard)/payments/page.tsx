@@ -13,6 +13,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { formatCurrency, type Payment } from '@/lib/mock-data';
 import { useBusinessState } from '@/lib/state/provider';
+import { TablePagination } from '@/components/table-pagination';
 
 const paymentMethods: Payment['method'][] = ['银行转账', '微信', '支付宝', '现金', '其他'];
 type EntryType = 'cash' | 'deposit';
@@ -52,7 +53,6 @@ export default function PaymentsPage() {
     const matchMethod = methodFilter === '全部' || payment.method === methodFilter;
     return matchSearch && matchMethod;
   });
-  const totalPages = Math.ceil(filtered.length / pageSize);
   const paginatedData = filtered.slice((currentPage - 1) * pageSize, currentPage * pageSize);
   const selectedCustomer = customers.find((customer) => customer.id === selectedCustomerId);
   const customerOrders = orders.filter(
@@ -178,16 +178,7 @@ export default function PaymentsPage() {
               )}
             </TableBody>
           </Table>
-          <div className="flex items-center justify-between border-t px-4 py-3">
-            <span className="text-xs text-muted-foreground">共 {filtered.length} 条记录</span>
-            <div className="flex gap-1">
-              <Button variant="outline" size="sm" className="h-7 text-xs" disabled={currentPage <= 1} onClick={() => setCurrentPage((page) => page - 1)}>上一页</Button>
-              {Array.from({ length: totalPages }, (_, index) => (
-                <Button key={index} variant={currentPage === index + 1 ? 'default' : 'outline'} size="sm" className="h-7 w-7 p-0 text-xs" onClick={() => setCurrentPage(index + 1)}>{index + 1}</Button>
-              ))}
-              <Button variant="outline" size="sm" className="h-7 text-xs" disabled={currentPage >= totalPages} onClick={() => setCurrentPage((page) => page + 1)}>下一页</Button>
-            </div>
-          </div>
+          <TablePagination total={filtered.length} currentPage={currentPage} pageSize={pageSize} onPageChange={setCurrentPage} />
         </CardContent>
       </Card>
 

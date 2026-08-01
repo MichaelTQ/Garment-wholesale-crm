@@ -18,6 +18,7 @@ import { splitFormList } from '@/lib/types/product';
 import { formatCustomerNo } from '@/lib/business-number';
 import { Checkbox } from '@/components/ui/checkbox';
 import { BatchDeleteButton } from '@/components/batch-delete-button';
+import { TablePagination } from '@/components/table-pagination';
 
 const defaultCountries = ['尼日利亚', '加纳', '肯尼亚', '坦桑尼亚', '南非', '刚果（金）', '安哥拉', '其他'];
 const statusOptions = ['全部', '活跃', '一般', '长期未购买', '有欠款', '有预存款'];
@@ -73,7 +74,6 @@ export default function CustomersPage() {
     return matchSearch && matchCountry && matchStatus;
   });
 
-  const totalPages = Math.ceil(filtered.length / pageSize);
   const paginatedData = filtered.slice((currentPage - 1) * pageSize, currentPage * pageSize);
   const pageIds = paginatedData.map((item) => item.id);
   const allPageSelected =
@@ -237,18 +237,7 @@ export default function CustomersPage() {
             </Table>
           </div>
           {/* Pagination */}
-          <div className="flex items-center justify-between border-t px-4 py-3">
-            <span className="text-xs text-muted-foreground">共 {filtered.length} 条记录</span>
-            <div className="flex gap-1">
-              <Button variant="outline" size="sm" className="h-7 text-xs" disabled={currentPage <= 1} onClick={() => setCurrentPage(p => p - 1)}>上一页</Button>
-              {Array.from({ length: totalPages }, (_, i) => (
-                <Button key={i} variant={currentPage === i + 1 ? 'default' : 'outline'} size="sm" className="h-7 w-7 text-xs p-0" onClick={() => setCurrentPage(i + 1)}>
-                  {i + 1}
-                </Button>
-              ))}
-              <Button variant="outline" size="sm" className="h-7 text-xs" disabled={currentPage >= totalPages} onClick={() => setCurrentPage(p => p + 1)}>下一页</Button>
-            </div>
-          </div>
+          <TablePagination total={filtered.length} currentPage={currentPage} pageSize={pageSize} onPageChange={setCurrentPage} />
         </CardContent>
       </Card>
 
